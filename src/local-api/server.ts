@@ -95,7 +95,10 @@ export class LocalApiServer {
     if (path === '/api/projects') return this.respond(response, 200, headers, { projects: projectsFromEvents(this.runtime.database.listEvents(1000)) });
     if (path === '/api/content') return this.respond(response, 200, headers, { content: this.runtime.database.listEvents().map(({ id, sourceId, occurredAt, title }) => ({ id, sourceId, occurredAt, title })) });
     if (path === '/api/quality') return this.respond(response, 200, headers, this.runtime.database.quality());
-    if (path === '/api/sources') return this.respond(response, 200, headers, { sources: this.runtime.database.listSources() });
+    if (path === '/api/sources') {
+      const states = new Map(this.runtime.database.listSources().map((source) => [source.id, source]));
+      return this.respond(response, 200, headers, { sources: this.runtime.catalog.map((manifest) => ({ ...manifest, ...(states.get(manifest.id) ?? { state: 'undiscovered', lastScanAt: null }) })) });
+    }
     if (path === '/api/scans') return this.respond(response, 200, headers, { scans: this.runtime.database.listScanRuns() });
     if (path === '/api/diagnostics') return this.respond(response, 200, headers, { diagnostics: this.runtime.database.listDiagnostics() });
     if (path === '/api/settings') return this.respond(response, 200, headers, { telemetry: 'disabled', scanFrequency: 'manual' });

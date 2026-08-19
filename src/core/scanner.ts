@@ -13,6 +13,21 @@ export class ScanCoordinator {
     const adapter = this.getAdapter(sourceId);
     const grant = this.database.getGrant(sourceId);
     const summary = this.database.beginScan(sourceId);
+    const health = await adapter.health();
+
+    if (health.state === 'unsupported') {
+      summary.status = 'blocked';
+      summary.endedAt = new Date().toISOString();
+      this.database.addDiagnostic({
+        sourceId,
+        code: 'ADAPTER_NOT_AVAILABLE',
+        severity: 'warning',
+        safeMessage: 'This source adapter is not available in the current build.',
+        createdAt: summary.endedAt,
+      });
+      this.database.finishScan(summary);
+      return summary;
+    }
 
     if (!grant || grant.revokedAt) {
       summary.status = 'blocked';

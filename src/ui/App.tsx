@@ -13,15 +13,25 @@ type Metric = {
   value: string;
 };
 
+type SourceSummary = {
+  id: string;
+  displayName: string;
+  state: string;
+  supportsBodies: boolean;
+  version: string;
+};
+
 type RuntimeState = {
   health: RequestState<JsonRecord>;
   dashboard: RequestState<JsonRecord>;
+  sources: RequestState<SourceSummary[]>;
   refreshedAt: Date | null;
 };
 
 const initialState: RuntimeState = {
   health: { status: 'loading', data: null, error: null },
   dashboard: { status: 'loading', data: null, error: null },
+  sources: { status: 'loading', data: null, error: null },
   refreshedAt: null,
 };
 
@@ -72,6 +82,21 @@ async function getJson(path: string, signal: AbortSignal): Promise<JsonRecord> {
   }
 
   return payload;
+}
+
+function sourceSummaries(payload: JsonRecord): SourceSummary[] {
+  const sources = payload.sources;
+  if (!Array.isArray(sources)) return [];
+  return sources.flatMap((value) => {
+    if (!isRecord(value) || typeof value.id !== 'string' || typeof value.displayName !== 'string' || typeof value.state !== 'string') return [];
+    return [{
+      id: value.id,
+      displayName: value.displayName,
+      state: value.state,
+      supportsBodies: value.supportsBodies === true,
+      version: typeof value.version === 'string' ? value.version : 'unknown',
+    }];
+  });
 }
 
 function valueLabel(value: JsonValue): string | null {
@@ -171,11 +196,13 @@ export function App() {
       ...current,
       health: { status: 'loading', data: null, error: null },
       dashboard: { status: 'loading', data: null, error: null },
+      sources: { status: 'loading', data: null, error: null },
     }));
 
-    const [healthResult, dashboardResult] = await Promise.allSettled([
+    const [healthResult, dashboardResult, sourcesResult] = await Promise.allSettled([
       getJson('/health', signal ?? new AbortController().signal),
       getJson('/api/dashboard', signal ?? new AbortController().signal),
+      getJson('/api/sources', signal ?? new AbortController().signal),
     ]);
 
     if (signal?.aborted) {
@@ -191,6 +218,10 @@ export function App() {
         dashboardResult.status === 'fulfilled'
           ? { status: 'ready', data: dashboardResult.value, error: null }
           : { status: 'error', data: null, error: dashboardResult.reason instanceof Error ? dashboardResult.reason.message : 'Dashboard request failed.' },
+      sources:
+        sourcesResult.status === 'fulfilled'
+          ? { status: 'ready', data: sourceSummaries(sourcesResult.value), error: null }
+          : { status: 'error', data: null, error: sourcesResult.reason instanceof Error ? sourcesResult.reason.message : 'Sources request failed.' },
       refreshedAt: new Date(),
     });
   }, []);
@@ -217,6 +248,7 @@ export function App() {
   const observedData = runtime.dashboard.status === 'ready' && runtime.dashboard.data ? hasObservedData(runtime.dashboard.data, metrics) : false;
   const hasError = runtime.health.status === 'error' || runtime.dashboard.status === 'error';
   const loading = runtime.health.status === 'loading' || runtime.dashboard.status === 'loading';
+  const sources = runtime.sources.status === 'ready' && runtime.sources.data ? runtime.sources.data : [];
 
   return (
     <main className="cockpit-shell">
@@ -235,6 +267,10 @@ export function App() {
           <a className="nav-item" href="#data-state">
             <span aria-hidden="true">◌</span>
             Evidence
+          </a>
+          <a className="nav-item" href="#sources">
+            <span aria-hidden="true">◫</span>
+            Sources
           </a>
           <a className="nav-item" href="#service-state">
             <span aria-hidden="true">◇</span>
@@ -294,6 +330,30 @@ export function App() {
         )}
       </section>
 
+        <section id="sources" className="source-centre" aria-labelledby="sources-title">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Source centre</p>
+              <h2 id="sources-title">Read permissions are separate</h2>
+            </div>
+            <p className="muted">No folders are scanned until explicitly authorized.</p>
+          </div>
+          {runtime.sources.status === 'loading' ? <p className="muted">Loading supported sources…</p> : null}
+          {runtime.sources.status === 'error' ? <p className="error-copy">The source inventory could not be loaded.</p> : null}
+          {runtime.sources.status === 'ready' ? (
+            <ul className="source-grid" aria-label="Supported data sources">
+              {sources.map((source) => (
+                <li key={source.id} className="source-row">
+                  <div>
+                    <strong>{source.displayName}</strong>
+                    <span>{source.supportsBodies ? 'Metadata by default · body requires separate permission' : 'Metadata only'}</span>
+                  </div>
+                  <span className={`source-state source-state--${source.state}`}>{readableLabel(source.state)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
       <aside id="service-state" className="evidence-panel" aria-labelledby="service-title">
         <div className="panel-header">
           <p className="eyebrow">Runtime</p>
@@ -317,6 +377,10 @@ export function App() {
           <div>
             <dt>Dashboard</dt>
             <dd>{runtime.dashboard.status}</dd>
+          </div>
+          <div>
+            <dt>Sources</dt>
+            <dd>{runtime.sources.status}</dd>
           </div>
         </dl>
       </aside>

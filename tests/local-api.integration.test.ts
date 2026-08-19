@@ -39,6 +39,16 @@ describe('local API authorization and scan lifecycle', () => {
     const { base, fixtureRoot } = await startApi();
     expect(await (await fetch(`${base}/health`)).json()).toMatchObject({ status: 'ready', storage: 'ready' });
 
+    const sources = await fetch(`${base}/api/sources`);
+    expect(await json(sources)).toMatchObject({ sources: expect.arrayContaining([
+      expect.objectContaining({ id: 'exports-compat' }),
+      expect.objectContaining({ id: 'obsidian' }),
+      expect.objectContaining({ id: 'git' }),
+      expect.objectContaining({ id: 'codex' }),
+      expect.objectContaining({ id: 'claude' }),
+      expect.objectContaining({ id: 'openclaw', state: 'unsupported' }),
+    ]) });
+
     const rejected = await fetch(`${base}/api/sources/exports-compat/grants`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ root: fixtureRoot, scope: 'metadata' }) });
     expect(rejected.status).toBe(403);
 
