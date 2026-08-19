@@ -1,0 +1,29 @@
+# User-provided reference material: may include private absolute paths or third-party assets.
+PRD.md
+工作台视觉参考图.png
+
+# Local application data and diagnostics
+.mw-local/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.db
+logs/
+diagnostics/
+exports/
+fixtures/private/
+
+# Environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Tooling output
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.DS_Store
