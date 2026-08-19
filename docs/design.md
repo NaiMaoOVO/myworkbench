@@ -5,30 +5,32 @@
 
 ## 1. Technology decision
 
-Build the desktop product with **Tauri v2 + React + TypeScript** and a Rust local core.
+Build the product as a **TypeScript local modular monolith**: React UI, Node 24 local runtime, native `node:sqlite` derived store, and an Electron desktop shell.
 
 Why this is the smallest suitable option:
 
-- One desktop application can package a local UI, native filesystem policy, SQLite, scheduling, and platform integration without a cloud backend.
-- Rust makes canonical path, symlink, and grant-boundary enforcement explicit at the scan boundary.
-- Tauri’s maintained plugins cover OS file dialogs, persistent non-sensitive UI settings, and launch-at-login.
-- The app can run a loopback-only HTTP server for compatibility APIs while keeping privileged operations in the native core.
+- The current development environment has Node 24 and built-in SQLite support (`node:sqlite`), while Rust/Tauri is not installed.
+- It keeps scanner policy, SQLite, local API, and platform shell in a single language/runtime, reducing initial delivery risk.
+- Electron provides mature macOS/Windows packaging, native dialogs, login-item integration, and a preload isolation boundary for the local UI.
+- The local runtime can preserve the required six read APIs and enforce the loopback control-API model without a cloud backend.
 
 Rejected for the initial implementation:
 
 - Microservices: unnecessary deployment, upgrade, and privacy complexity.
 - Browser-only application: cannot safely own local permissions, background lifecycle, and install experience.
-- Electron: viable fallback, but selected only if Tauri packaging blocks v1.0; it has a larger distribution/runtime footprint for this local utility.
+- Tauri: technically attractive and retained as a future migration option, but not selected for M1 because its Rust toolchain is not available in the current environment and would delay a verifiable core.
+
+Electron security defaults are mandatory: context isolation on, sandbox on, Node integration off in renderer processes, navigation and window-open allowlists, and a narrow typed preload bridge.
 
 ## 2. Module boundaries
 
 ```text
-apps/desktop/                 Tauri shell and React UI
-crates/core/                  domain model, authorization, scanner orchestration
-crates/adapters/              versioned source adapters and contract harness
-crates/storage/               SQLite schema, migrations, repositories
-crates/local-api/             loopback read/control API and request protections
-crates/platform/              paths, launch lifecycle, OS abstractions
+apps/desktop/                 Electron main process, preload bridge, React UI
+src/core/                     domain model, authorization, scanner orchestration
+src/adapters/                 versioned source adapters and contract harness
+src/storage/                  SQLite schema, migrations, repositories
+src/local-api/                loopback read/control API and request protections
+src/platform/                 paths, launch lifecycle, OS abstractions
 fixtures/anonymous/           synthetic adapter fixtures only
 tests/                        integration, security, API, UI checks
 docs/                         requirements, design, release and support docs
@@ -38,16 +40,16 @@ The UI depends on API-facing view models, not adapter internals. Adapters depend
 
 ## 3. Adapter contract
 
-```rust
-trait SourceAdapter {
-  fn manifest(&self) -> AdapterManifest;
-  fn discover(&self, platform: &PlatformContext) -> Vec<CandidateLocation>;
-  fn preview(&self, grant: &AuthorizationGrant) -> Result<ScanPreview, AdapterError>;
-  fn scan(&self, grant: &AuthorizationGrant, cursor: Option<ScanCursor>) -> ScanStream;
-  fn normalize(&self, raw: RawRecord) -> Result<NormalizedRecord, AdapterError>;
-  fn redact(&self, record: NormalizedRecord, scope: ContentScope) -> NormalizedRecord;
-  fn health(&self) -> AdapterHealth;
-  fn migrate(&self, from_version: AdapterVersion) -> Result<(), AdapterError>;
+```ts
+interface SourceAdapter {
+  manifest(): AdapterManifest;
+  discover(platform: PlatformContext): Promise<CandidateLocation[]>;
+  preview(grant: AuthorizationGrant): Promise<ScanPreview>;
+  scan(grant: AuthorizationGrant, cursor?: ScanCursor): AsyncIterable<ScanRecord>;
+  normalize(raw: RawRecord): NormalizedRecord;
+  redact(record: NormalizedRecord, scope: ContentScope): NormalizedRecord;
+  health(): Promise<AdapterHealth>;
+  migrate(fromVersion: AdapterVersion): Promise<void>;
 }
 ```
 

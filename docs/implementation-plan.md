@@ -7,7 +7,7 @@
 
 ## M1 — Cross-platform core
 
-**Deliver:** Tauri shell, Rust workspace, local SQLite index, platform path abstraction, grant model, scanner orchestration, adapter contract, exports compatibility adapter skeleton, six read API compatibility routes, protected local control API skeleton.
+**Deliver:** Electron shell skeleton, React UI shell, Node 24 local runtime, native SQLite index, platform path abstraction, grant model, scanner orchestration, adapter contract, exports compatibility adapter skeleton, six read API compatibility routes, protected local control API skeleton.
 **Gate:** unit and security tests for grant boundaries, symlink escape, redaction, statuses, local API authorization; anonymous contract harness passes; app opens a real local health surface.
 
 ## M2 — First sources and lifecycle loop
