@@ -1,0 +1,36 @@
+{
+  "name": "myworkbench",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first personal work evidence cockpit",
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev:web": "vite",
+    "dev:core": "tsx src/local-api/dev.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:web": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build": "npm run typecheck && npm run build:web && npm run build:electron",
+    "start": "electron .",
+    "lint": "npm run typecheck"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.1",
+    "electron": "43.4.1",
+    "electron-builder": "26.15.3",
+    "tsx": "4.21.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "4.1.11"
+  }
+}

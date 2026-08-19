@@ -23,6 +23,8 @@ fixtures/private/
 # Tooling output
 node_modules/
 dist/
+dist-web/
+dist-electron/
 coverage/
 playwright-report/
 test-results/
