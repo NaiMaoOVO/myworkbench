@@ -73,6 +73,15 @@ describe('local API authorization and scan lifecycle', () => {
     expect(dashboard.headers.get('access-control-allow-origin')).toBe(appOrigin);
     expect(await json(dashboard)).toMatchObject({ eventCount: 2, projectCount: 1, dataState: 'ready' });
 
+    const heatmap = await fetch(`${base}/api/heatmap`);
+    expect(await json(heatmap)).toMatchObject({ events: expect.arrayContaining([expect.objectContaining({ sourceId: 'exports-compat' })]) });
+
+    const events = await fetch(`${base}/api/events`);
+    expect(await json(events)).toMatchObject({ events: expect.arrayContaining([expect.objectContaining({ sourceId: 'exports-compat', workspace: 'sample-product' })]) });
+
+    const projects = await fetch(`${base}/api/projects`);
+    expect(await json(projects)).toMatchObject({ projects: expect.arrayContaining([expect.objectContaining({ name: 'sample-product', eventCount: 2 })]) });
+
     const content = await fetch(`${base}/api/content`);
     expect(JSON.stringify(await json(content))).not.toContain('synthetic body');
 

@@ -15,7 +15,7 @@ This repository starts without source code. The supplied PRD describes a prior i
 | Control APIs | secure loopback routes plus restricted Electron IPC grant/preview/scan/revoke/delete flow | sources/grants/scans/settings/diagnostics and persisted settings | partial: desktop runtime smoke test and settings persistence remain | M1/M2 |
 | Obsidian/Git/Codex/Claude | metadata-capable adapters with anonymous contract tests | native adapters plus secure UI authorization | partial: no real-data verification or UI controls | M2 |
 | Remaining agent tools | visible as explicit `unsupported` inventory entries | native adapters and diagnostics | complete parser/fixture work remains | M3 |
-| OLED cockpit UI | absent | fixed-slot card rack and evidence UI | complete | M4 |
+| OLED cockpit UI | OLED layout, real-data source centre, fixed-slot project rack and evidence detail | full visual/system/device acceptance | partial: timeline, visual reference comparison and runtime validation remain | M4 |
 | Cross-platform packaging | absent | install/restart/uninstall workflows | complete | M5 |
 | Automated verification | absent | unit, contract, integration, security, UI regression | complete | M1–M5 |
 

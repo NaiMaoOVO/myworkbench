@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { ProjectRack, type ProjectSelection } from './ProjectRack';
 
 type JsonValue = null | boolean | number | string | JsonRecord | JsonValue[];
 type JsonRecord = { [key: string]: JsonValue };
@@ -99,6 +100,8 @@ export function App() {
   const [selectionHandle, setSelectionHandle] = useState<string | null>(null);
   const [preview, setPreview] = useState<JsonRecord | null>(null);
   const [operation, setOperation] = useState<OperationState>({ busy: null, message: null, error: null });
+  const [projectSelection, setProjectSelection] = useState<ProjectSelection | null>(null);
+  const [projectRefreshKey, setProjectRefreshKey] = useState(0);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setRuntime((current) => ({ ...current, health: { status: 'loading', data: null, error: null }, dashboard: { status: 'loading', data: null, error: null }, sources: { status: 'loading', data: null, error: null } }));
@@ -121,7 +124,7 @@ export function App() {
 
   useEffect(() => { const controller = new AbortController(); void load(controller.signal); return () => controller.abort(); }, [load]);
 
-  const refresh = useCallback(async () => { setRefreshing(true); try { await load(); } finally { setRefreshing(false); } }, [load]);
+  const refresh = useCallback(async () => { setRefreshing(true); try { await load(); setProjectRefreshKey((key) => key + 1); } finally { setRefreshing(false); } }, [load]);
   const sources = runtime.sources.status === 'ready' && runtime.sources.data ? runtime.sources.data : [];
   const selectedSource = sources.find((source) => source.id === selectedSourceId) ?? null;
   const metrics = useMemo(() => runtime.dashboard.status === 'ready' && runtime.dashboard.data ? extractMetrics(runtime.dashboard.data) : [], [runtime.dashboard]);
@@ -192,6 +195,7 @@ export function App() {
         <header className="workspace-header"><div><p className="eyebrow">Personal work evidence</p><h1 id="page-title">MyWorkbench</h1></div><button className="refresh-button" type="button" onClick={() => void refresh()} disabled={loading || refreshing}><span aria-hidden="true">↻</span>{refreshing ? 'Refreshing' : 'Refresh'}</button></header>
         <div className="sr-only" aria-live="polite" aria-atomic="true">{loading ? 'Loading local service and dashboard.' : hasError ? 'Some local data could not be loaded.' : operation.message ?? operation.error ?? 'Local dashboard updated.'}</div>
         {loading ? <StatePanel title="Loading local evidence" detail="Checking the local service and reading the dashboard." /> : hasError ? <StatePanel title="Local data is unavailable" detail="The shell could not load one or more local read endpoints."><button className="text-button" type="button" onClick={() => void refresh()}>Try again</button></StatePanel> : !observedData ? <StatePanel title="No indexed evidence yet" detail="The local service is connected, but the dashboard has no visible evidence. Authorize a source and run a scan to populate this view." /> : <section id="data-state" className="dashboard-content" aria-label="Dashboard data"><div className="section-heading"><div><p className="eyebrow">Observed dashboard data</p><h2>Current evidence</h2></div>{runtime.refreshedAt ? <time dateTime={runtime.refreshedAt.toISOString()}>Updated just now</time> : null}</div><div className="metrics-grid">{metrics.map((metric) => <article className="metric-card" key={metric.label}><p>{metric.label}</p><strong>{metric.value}</strong></article>)}</div></section>}
+        <ProjectRack refreshKey={projectRefreshKey} onSelectionChange={setProjectSelection} />
       </section>
 
       <section id="sources" className="source-centre" aria-labelledby="sources-title">
@@ -212,7 +216,7 @@ export function App() {
         </section> : null}
       </section>
 
-      <aside id="service-state" className="evidence-panel" aria-labelledby="service-title"><div className="panel-header"><p className="eyebrow">Runtime</p><span className={runtime.health.status === 'ready' ? 'health-dot health-dot--ready' : 'health-dot'} aria-hidden="true" /></div><h2 id="service-title">Local service</h2>{runtime.health.status === 'loading' ? <p className="muted">Checking health endpoint…</p> : null}{runtime.health.status === 'ready' && runtime.health.data ? <p className="service-status">{healthLabel(runtime.health.data)}</p> : null}{runtime.health.status === 'error' ? <p className="error-copy">{runtime.health.error}</p> : null}<div className="privacy-note"><span aria-hidden="true">⌁</span><p>Desktop authorization uses a restricted native bridge. This page never receives control credentials or selected folder paths.</p></div><dl className="endpoint-list"><div><dt>Health</dt><dd>{runtime.health.status}</dd></div><div><dt>Dashboard</dt><dd>{runtime.dashboard.status}</dd></div><div><dt>Sources</dt><dd>{runtime.sources.status}</dd></div></dl></aside>
+      <aside id="service-state" className="evidence-panel" aria-labelledby="service-title"><div className="panel-header"><p className="eyebrow">{projectSelection ? 'Selected evidence' : 'Runtime'}</p><span className={runtime.health.status === 'ready' ? 'health-dot health-dot--ready' : 'health-dot'} aria-hidden="true" /></div>{projectSelection ? <><h2 id="service-title">{projectSelection.project.name}</h2><p className="service-status">{projectSelection.project.eventCount} observed events · latest {new Date(projectSelection.project.lastActivity).toLocaleString()}</p><ol className="evidence-events">{projectSelection.events.length ? projectSelection.events.map((event) => <li key={event.id}><time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleString()}</time><strong>{event.title}</strong><span>{readableLabel(event.sourceId)} · {readableLabel(event.type)}</span></li>) : <li className="muted">No directly linked event detail is available yet.</li>}</ol></> : <><h2 id="service-title">Local service</h2>{runtime.health.status === 'loading' ? <p className="muted">Checking health endpoint…</p> : null}{runtime.health.status === 'ready' && runtime.health.data ? <p className="service-status">{healthLabel(runtime.health.data)}</p> : null}{runtime.health.status === 'error' ? <p className="error-copy">{runtime.health.error}</p> : null}</>}<div className="privacy-note"><span aria-hidden="true">⌁</span><p>Desktop authorization uses a restricted native bridge. This page never receives control credentials or selected folder paths.</p></div><dl className="endpoint-list"><div><dt>Health</dt><dd>{runtime.health.status}</dd></div><div><dt>Dashboard</dt><dd>{runtime.dashboard.status}</dd></div><div><dt>Sources</dt><dd>{runtime.sources.status}</dd></div></dl></aside>
     </main>
   );
 }
