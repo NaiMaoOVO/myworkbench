@@ -1,0 +1,103 @@
+import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import type { ContentScope } from '../../src/core/types.js';
+import { WorkbenchSourceService } from '../../src/core/source-service.js';
+
+const sourceIdPattern = /^[a-z0-9-]{1,64}$/;
+
+function assertTrustedSender(event: IpcMainInvokeEvent, uiOrigin: string): void {
+  const senderUrl = event.senderFrame?.url;
+  if (!senderUrl || (!senderUrl.startsWith(`${uiOrigin}/`) && senderUrl !== `${uiOrigin}/`)) {
+    throw new Error('Untrusted renderer origin.');
+  }
+}
+
+function assertSourceId(value: unknown): string {
+  if (typeof value !== 'string' || !sourceIdPattern.test(value)) throw new Error('Invalid source identifier.');
+  return value;
+}
+
+function assertScope(value: unknown): ContentScope {
+  if (value === 'metadata' || value === 'metadata_and_body') return value;
+  throw new Error('Invalid source permission level.');
+}
+
+function assertHandle(value: unknown): string {
+  if (typeof value !== 'string' || value.length > 128) throw new Error('Invalid folder selection.');
+  return value;
+}
+
+function safeError(error: unknown): { ok: false; error: string } {
+  const message = error instanceof Error ? error.message : '';
+  const safeMessages = new Set([
+    'Invalid source identifier.',
+    'Invalid source permission level.',
+    'Invalid folder selection.',
+    'This source adapter is not available in the current build.',
+    'An active source authorization is required.',
+    'The selected folder is unavailable. Please choose it again.',
+  ]);
+  return { ok: false, error: safeMessages.has(message) ? message : 'The source operation could not be completed. Review the source selection and try again.' };
+}
+
+export function registerSourceIpc(service: WorkbenchSourceService, uiOrigin: string): void {
+  ipcMain.handle('sources:list', async (event) => {
+    try {
+      assertTrustedSender(event, uiOrigin);
+      return { ok: true, sources: service.list() } as const;
+    } catch (error) {
+      return safeError(error);
+    }
+  });
+
+  ipcMain.handle('sources:choose-directory', async (event, rawSourceId: unknown) => {
+    try {
+      assertTrustedSender(event, uiOrigin);
+      const sourceId = assertSourceId(rawSourceId);
+      const window = BrowserWindow.fromWebContents(event.sender);
+      const options = { properties: ['openDirectory', 'dontAddToRecent'] as Array<'openDirectory' | 'dontAddToRecent'> };
+      const result = window ? await dialog.showOpenDialog(window, options) : await dialog.showOpenDialog(options);
+      if (result.canceled || result.filePaths.length !== 1) return { ok: true, cancelled: true } as const;
+      const selectionHandle = await service.createSelection(sourceId, result.filePaths[0]);
+      return { ok: true, cancelled: false, selectionHandle } as const;
+    } catch (error) {
+      return safeError(error);
+    }
+  });
+
+  ipcMain.handle('sources:preview-selection', async (event, rawSourceId: unknown, rawHandle: unknown, rawScope: unknown) => {
+    try {
+      assertTrustedSender(event, uiOrigin);
+      const preview = await service.previewSelection(assertSourceId(rawSourceId), assertHandle(rawHandle), assertScope(rawScope));
+      return { ok: true, value: preview } as const;
+    } catch (error) {
+      return safeError(error);
+    }
+  });
+
+  ipcMain.handle('sources:grant', async (event, rawSourceId: unknown, rawHandle: unknown, rawScope: unknown) => {
+    try {
+      assertTrustedSender(event, uiOrigin);
+      const grant = await service.grant(assertSourceId(rawSourceId), assertHandle(rawHandle), assertScope(rawScope));
+      return { ok: true, grant: { sourceId: grant.sourceId, scope: grant.scope, grantedAt: grant.grantedAt } } as const;
+    } catch (error) {
+      return safeError(error);
+    }
+  });
+
+  for (const [channel, action] of [
+    ['sources:preview', (sourceId: string) => service.preview(sourceId)],
+    ['sources:scan', (sourceId: string) => service.scan(sourceId)],
+    ['sources:revoke', (sourceId: string) => service.revoke(sourceId)],
+    ['sources:delete-index', (sourceId: string) => service.deleteIndex(sourceId)],
+  ] as const) {
+    ipcMain.handle(channel, async (event, rawSourceId: unknown) => {
+      try {
+        assertTrustedSender(event, uiOrigin);
+        const value = await action(assertSourceId(rawSourceId));
+        return { ok: true, value } as const;
+      } catch (error) {
+        return safeError(error);
+      }
+    });
+  }
+}

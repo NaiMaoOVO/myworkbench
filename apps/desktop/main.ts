@@ -1,14 +1,20 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import { join } from 'node:path';
 import { LocalApiServer } from '../../src/local-api/server.js';
+import { WorkbenchSourceService } from '../../src/core/source-service.js';
+import { registerSourceIpc } from './ipc.js';
+import { trustedUiUrl } from '../../src/platform/trusted-ui-url.js';
 
 let localApi: LocalApiServer | undefined;
+let sourceService: WorkbenchSourceService | undefined;
 
 async function createWindow(): Promise<void> {
-  localApi = new LocalApiServer({
-    databasePath: join(app.getPath('userData'), 'workbench.sqlite'),
-    appOrigin: 'http://127.0.0.1:5173',
-  });
+  const uiUrl = trustedUiUrl(process.env.MYWORKBENCH_UI_URL ?? 'http://127.0.0.1:5173/');
+  const uiOrigin = uiUrl.origin;
+  const databasePath = join(app.getPath('userData'), 'workbench.sqlite');
+  localApi = new LocalApiServer({ databasePath, appOrigin: uiOrigin });
+  sourceService = new WorkbenchSourceService(databasePath);
+  registerSourceIpc(sourceService, uiOrigin);
   const apiPort = await localApi.start();
 
   const window = new BrowserWindow({
@@ -26,16 +32,13 @@ async function createWindow(): Promise<void> {
   });
 
   window.once('ready-to-show', () => window.show());
-  window.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.startsWith('https://')) void shell.openExternal(url);
-    return { action: 'deny' };
-  });
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => {
-    if (url !== 'http://127.0.0.1:5173/') event.preventDefault();
+    if (!url.startsWith(`${uiOrigin}/`) && url !== `${uiOrigin}/`) event.preventDefault();
   });
-  const uiUrl = process.env.MYWORKBENCH_UI_URL ?? 'http://127.0.0.1:5173/';
-  const apiOrigin = encodeURIComponent(`http://127.0.0.1:${apiPort}`);
-  await window.loadURL(`${uiUrl}${uiUrl.includes('?') ? '&' : '?'}apiOrigin=${apiOrigin}`);
+  window.webContents.on('will-attach-webview', (event) => event.preventDefault());
+  uiUrl.searchParams.set('apiOrigin', `http://127.0.0.1:${apiPort}`);
+  await window.loadURL(uiUrl.toString());
 }
 
 app.whenReady().then(createWindow).catch((error) => {
@@ -44,4 +47,7 @@ app.whenReady().then(createWindow).catch((error) => {
 });
 
 app.on('window-all-closed', () => app.quit());
-app.on('before-quit', () => void localApi?.stop());
+app.on('before-quit', () => {
+  sourceService?.close();
+  void localApi?.stop();
+});

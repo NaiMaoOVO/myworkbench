@@ -12,7 +12,7 @@ This repository starts without source code. The supplied PRD describes a prior i
 | Adapter runtime | absent | versioned protocol, isolation, fixtures | complete | M1 |
 | Exports support | absent | compatibility adapter | complete | M1/M2 |
 | Read APIs | absent | dashboard, heatmap, events, projects, content, quality | complete | M1 |
-| Control APIs | secure loopback grant/preview/scan/revoke/delete routes | sources/grants/scans/settings/diagnostics plus native UI bridge | partial: Electron IPC bridge and settings persistence remain | M1/M2 |
+| Control APIs | secure loopback routes plus restricted Electron IPC grant/preview/scan/revoke/delete flow | sources/grants/scans/settings/diagnostics and persisted settings | partial: desktop runtime smoke test and settings persistence remain | M1/M2 |
 | Obsidian/Git/Codex/Claude | metadata-capable adapters with anonymous contract tests | native adapters plus secure UI authorization | partial: no real-data verification or UI controls | M2 |
 | Remaining agent tools | visible as explicit `unsupported` inventory entries | native adapters and diagnostics | complete parser/fixture work remains | M3 |
 | OLED cockpit UI | absent | fixed-slot card rack and evidence UI | complete | M4 |

@@ -11,12 +11,12 @@
 - Codex and Claude adapters parse a constrained, documented anonymous JSONL compatibility shape; each keeps bodies out of metadata-only scans and isolates malformed records.
 - The exports compatibility adapter remains available and visibly separate from native sources.
 - iFlow, ZCode, Kimi Code, Gemini, Hermes, and OpenClaw are visible as `unsupported`; the API does not imply that they are working adapters.
-- Source state inventory is displayed from the real `/api/sources` response in the UI.
-- The existing control API supports grant, preview, scan, revoke, and delete-derived-index operations for adapters registered by the local runtime. State-changing calls still require exact Origin, installation secret, and CSRF token.
+- Source state inventory is displayed from the real `/api/sources` response in browser mode and from the restricted desktop IPC source inventory in the Electron shell.
+- The desktop source centre implements native folder selection → opaque handle → preview → explicit authorization → scan/revoke/delete-derived-index. Browser mode remains read-only. The compatibility control API separately supports grant, preview, scan, revoke, and delete-derived-index operations, with exact Origin, installation secret, and CSRF requirements.
 
 ## Intentionally not yet complete
 
-- A secure Electron IPC bridge is specified in the architecture; implementation is the next M2 increment. Secrets are deliberately not returned from a public loopback endpoint or placed in page URLs.
+- A secure Electron IPC bridge is implemented: the native folder picker returns only an opaque, one-time handle; preview/grant/scan/revoke/delete-index operations run in the main process. Secrets and selected paths are not returned from a public loopback endpoint, placed in URLs, or exposed to the renderer. The Electron runtime itself is not yet end-to-end smoke-tested in this environment.
 - No real user source directory has been authorized or scanned during automated verification. Tests use temporary directories and anonymous fixtures only.
 - Default-path discovery is intentionally disabled until per-tool format and candidate-path rules are researched and validated; no current-machine path is treated as product behavior.
 - iFlow, ZCode, Kimi Code, Gemini, Hermes, and OpenClaw require dedicated parsers, fixtures, and contract tests.
@@ -25,7 +25,7 @@
 
 ## M2 acceptance remaining
 
-1. Implement Electron IPC-backed directory selection and authorization controls without exposing control credentials to arbitrary web content.
-2. Add end-to-end authorization flows for Obsidian, Git, Codex, and Claude, including revoke and index deletion in the UI.
-3. Run one user-supervised real-data scan per first-wave adapter, outside the test fixtures and only after explicit path selection.
-4. Add the six remaining adapter implementations and source-specific anonymous fixture contracts.
+1. Run an Electron-runtime smoke test for the IPC bridge, including trusted sender rejection and native folder-dialog behavior.
+2. Run one user-supervised real-data scan per first-wave adapter, outside the test fixtures and only after explicit path selection.
+3. Add the six remaining adapter implementations and source-specific anonymous fixture contracts.
+4. Validate Windows installation, startup recovery, and uninstall.
