@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ProjectRack, type ProjectSelection } from './ProjectRack';
+import { ActivityTimeline } from './ActivityTimeline';
 
 type JsonValue = null | boolean | number | string | JsonRecord | JsonValue[];
 type JsonRecord = { [key: string]: JsonValue };
@@ -196,6 +197,7 @@ export function App() {
         <div className="sr-only" aria-live="polite" aria-atomic="true">{loading ? 'Loading local service and dashboard.' : hasError ? 'Some local data could not be loaded.' : operation.message ?? operation.error ?? 'Local dashboard updated.'}</div>
         {loading ? <StatePanel title="Loading local evidence" detail="Checking the local service and reading the dashboard." /> : hasError ? <StatePanel title="Local data is unavailable" detail="The shell could not load one or more local read endpoints."><button className="text-button" type="button" onClick={() => void refresh()}>Try again</button></StatePanel> : !observedData ? <StatePanel title="No indexed evidence yet" detail="The local service is connected, but the dashboard has no visible evidence. Authorize a source and run a scan to populate this view." /> : <section id="data-state" className="dashboard-content" aria-label="Dashboard data"><div className="section-heading"><div><p className="eyebrow">Observed dashboard data</p><h2>Current evidence</h2></div>{runtime.refreshedAt ? <time dateTime={runtime.refreshedAt.toISOString()}>Updated just now</time> : null}</div><div className="metrics-grid">{metrics.map((metric) => <article className="metric-card" key={metric.label}><p>{metric.label}</p><strong>{metric.value}</strong></article>)}</div></section>}
         <ProjectRack refreshKey={projectRefreshKey} onSelectionChange={setProjectSelection} />
+        <ActivityTimeline refreshKey={projectRefreshKey} />
       </section>
 
       <section id="sources" className="source-centre" aria-labelledby="sources-title">

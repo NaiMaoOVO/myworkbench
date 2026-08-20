@@ -10,6 +10,7 @@
 - Click, keyboard arrows/Home/End, wheel input, and left/right drag gestures change the selected project.
 - Only the newly selected card moves forward and the previously selected card returns to its slot. Other cards retain their fixed transforms.
 - The selected card changes to green glass material; project event detail appears in the existing right-side evidence surface.
+- A bottom activity track reads real `/api/heatmap` and `/api/events` data, supports date selection, and lists observed source evidence for the selected date.
 - The rack includes `listbox`/`option` semantics, visible focus handling, and a `prefers-reduced-motion` path that removes perspective and large movement.
 - Existing 320/375/768/1024/1440 responsive constraints remain in the shared layout; the rack collapses its detail and card geometry on smaller widths.
 
@@ -18,5 +19,5 @@
 1. Run desktop visual tests against an actual Electron runtime at 320, 375, 768, 1024, 1440, and target-wide widths.
 2. Verify pointer drag and wheel selection in the desktop shell, including trackpads and touch input.
 3. Add new-project depth-entry behavior based on a real scan delta.
-4. Add the complete timeline/heatmap and content/quality view shells, then compare real-data screenshots against the supplied reference image.
+4. Add content/quality view shells, then compare real-data screenshots against the supplied reference image.
 5. Validate no page-level overflow, long-text behavior, empty/loading/error surfaces, high contrast, and 200% zoom in a browser/runtime capable of rendering the local app.
