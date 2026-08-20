@@ -101,3 +101,7 @@ Support platform-appropriate launch-at-login, scan frequency, data directory, di
 - Validate desktop widths 1440 and target wide screen; responsive widths 320, 375, 768, and 1024.
 - Validate keyboard controls, focus, text scaling, high contrast, reduced motion, empty/loading/error states, long text, and no page-level horizontal overflow.
 - A stage cannot be reported complete if tests required by that stage fail.
+
+## 7. Desktop authorization UI security (M2 amendment)
+
+When running inside the desktop shell, authorization controls must use a narrow, validated IPC bridge. The renderer may request a native folder selection, but it must not receive raw control credentials or a general filesystem capability. A selected folder is represented by an opaque, short-lived handle until the user explicitly confirms the source and metadata/body scope. Browser development mode remains read-only for source control unless a separate secure development bridge is added.

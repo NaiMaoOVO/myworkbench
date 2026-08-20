@@ -140,3 +140,25 @@ Only `previous` and `next` transition. New projects start from the far-right dep
 - Security: traversal, symlink escape, malicious markup, cross-origin loopback requests, token/CSRF rejection, redacted logs.
 - UI: keyboard route, reduced-motion route, responsive screen sizes, stable card slots.
 - Platform: macOS and Windows installation, scan, restart recovery, and uninstall checked with real authorized data before release.
+
+## 10. Secure desktop authorization bridge (M2 amendment)
+
+The desktop renderer must **not** receive the loopback installation secret, CSRF token, raw granted root, or an endpoint that can mint those values. Electron main owns the database, authorization grants, file-dialog interaction, and source-control calls.
+
+The preload bridge exposes a narrow allowlist only to the trusted MyWorkbench renderer:
+
+```text
+sources.list()
+sources.chooseDirectory(sourceId) -> opaque one-time selection handle
+sources.grant(sourceId, selectionHandle, scope)
+sources.preview(sourceId)
+sources.scan(sourceId)
+sources.revoke(sourceId)
+sources.deleteIndex(sourceId)
+```
+
+`chooseDirectory` runs the native OS folder picker in the main process. It returns an opaque, short-lived selection handle—not a filesystem path. `grant` accepts a handle only when it belongs to the same supported source and has not expired. The main process canonicalizes the selected root before storing the grant. Every subsequent scan still performs path-boundary checks before file access.
+
+Each IPC handler verifies the sender's origin against the application UI origin, validates source IDs against the registered adapter catalog, rejects unsupported sources, and returns safe messages. No generic IPC channel, `shell` bridge, filesystem bridge, or arbitrary command bridge is exposed. The app blocks webview attachment, denies uncontrolled navigation and new windows, and keeps context isolation, sandboxing, and Node integration restrictions enabled.
+
+The loopback control API remains protected for compatibility clients. The desktop UI uses IPC for privileged operations; it does not use loopback credentials.

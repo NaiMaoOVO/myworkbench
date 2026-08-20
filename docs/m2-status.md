@@ -1,6 +1,6 @@
 # M2 status — first source adapters and source inventory
 
-**Updated:** August 19, 2026
+**Updated:** August 20, 2026
 **Status:** partial; not ready to claim full M2 completion.
 
 ## Implemented and verified with anonymous fixtures
@@ -16,7 +16,7 @@
 
 ## Intentionally not yet complete
 
-- The Electron renderer does not yet expose authorization controls. Secrets are deliberately not returned from a public loopback endpoint or placed in page URLs. The next secure implementation must use a narrow, validated Electron IPC bridge.
+- A secure Electron IPC bridge is specified in the architecture; implementation is the next M2 increment. Secrets are deliberately not returned from a public loopback endpoint or placed in page URLs.
 - No real user source directory has been authorized or scanned during automated verification. Tests use temporary directories and anonymous fixtures only.
 - Default-path discovery is intentionally disabled until per-tool format and candidate-path rules are researched and validated; no current-machine path is treated as product behavior.
 - iFlow, ZCode, Kimi Code, Gemini, Hermes, and OpenClaw require dedicated parsers, fixtures, and contract tests.
