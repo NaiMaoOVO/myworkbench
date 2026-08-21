@@ -32,12 +32,19 @@ The acceptance run surfaced and fixed four real desktop-only defects:
 
 Programmatic palette comparison against the supplied reference: dark background share matches closely (reference ≈0.85, cockpit ≈0.89), while green accent coverage is higher in the app (~0.037 vs ~0.003 sampled). A human or image-capable review should confirm whether the selected-card glass and heat colours need restraint; screenshots are preserved locally for that review.
 
+## Packaging and desktop lifecycle (M5, August 22, 2026)
+
+- The packaged shell now hosts the built UI itself: `LocalApiServer` optionally serves `dist-web` on the same loopback origin as the API (`uiRoot` option), with path-traversal rejection, strict CSP, and hashed-asset caching. Dev mode keeps the explicit loopback UI URL, and `MYWORKBENCH_UI_URL` remains a test override.
+- electron-builder config (`electron-builder.yml`) produces an arm64 DMG and a Windows NSIS installer; `react`/`react-dom` moved to devDependencies so the installer ships only the built bundles; an afterPack hook strips file-provider metadata and re-signs the bundle ad hoc so Apple Silicon launches it.
+- Local verification on this machine: the packaged app launched in self-hosted mode (UI and API on one loopback origin), read the seeded database (11 events / 3 projects), kept the full source inventory (11 sources, six new adapters `awaiting_authorization`), survived a full stop/relaunch with identical data (restart recovery), and uninstalled cleanly with no workspace leftovers. The sandboxed Chromium flags used by the harness are environment accommodations, not product requirements.
+- `hdiutil` is denied inside this sandbox, so the DMG itself is produced by `.github/workflows/build.yml` (macOS DMG + Windows NSIS on tag push, tests gate the build). Local equivalent: `npm run dist:mac -c.directories.output=/tmp/myworkbench-release`.
+
 ## Remaining work
 
 1. Add new-project depth-entry behavior based on a real scan delta.
 2. Human/image-model visual review of materials and lighting against the reference image; refine optical layers if the green accent coverage is judged excessive.
-3. Verify the six new agent adapters against real installed-tool data (contract fixtures are anonymous and synthetic by policy).
-4. macOS/Windows packaging, install, restart recovery, uninstall verification, and push.
+3. Verify the agent adapters against real installed-tool data (contract fixtures are anonymous and synthetic by policy).
+4. Configure the GitHub remote, push, and let CI produce the release artifacts; signing keys and notarization remain future work for public distribution.
 
 ## Agent adapter coverage (M3, August 22, 2026)
 

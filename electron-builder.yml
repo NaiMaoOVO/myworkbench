@@ -1,0 +1,36 @@
+appId: app.myworkbench.desktop
+productName: MyWorkbench
+copyright: Local-first personal work evidence cockpit
+electronDist: node_modules/electron/dist
+directories:
+  # Local runs inside a file-provider sync domain must override this via
+  # `-c.directories.output=/tmp/myworkbench-release`, because the domain keeps
+  # re-stamping FinderInfo onto freshly packed files, which codesign rejects.
+  output: release
+  buildResources: build
+files:
+  - dist-web/**
+  - dist-electron/**
+  - package.json
+  - "!**/node_modules/**"
+asar: true
+compression: normal
+npmRebuild: false
+afterPack: scripts/packaging/after-pack.cjs
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  category: public.app-category.productivity
+  identity: null
+  minimumSystemVersion: "13.0"
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false

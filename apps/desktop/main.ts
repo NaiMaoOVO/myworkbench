@@ -9,13 +9,25 @@ let localApi: LocalApiServer | undefined;
 let sourceService: WorkbenchSourceService | undefined;
 
 async function createWindow(): Promise<void> {
-  const uiUrl = trustedUiUrl(process.env.MYWORKBENCH_UI_URL ?? 'http://127.0.0.1:5173/');
-  const uiOrigin = uiUrl.origin;
+  // Packaged builds host the built UI from app resources on the same loopback
+  // origin as the API; dev builds load an explicit loopback UI URL.
+  const overrideEnv = process.env.MYWORKBENCH_UI_URL;
+  const packagedSelfHosted = app.isPackaged && !overrideEnv;
+  const uiRoot = packagedSelfHosted ? join(app.getAppPath(), 'dist-web') : undefined;
+  const placeholderOrigin = 'http://127.0.0.1:65535';
+  const initialOrigin = packagedSelfHosted ? placeholderOrigin : trustedUiUrl(overrideEnv ?? 'http://127.0.0.1:5173/').origin;
   const databasePath = join(app.getPath('userData'), 'workbench.sqlite');
-  localApi = new LocalApiServer({ databasePath, appOrigin: uiOrigin });
+  localApi = new LocalApiServer({ databasePath, appOrigin: initialOrigin, uiRoot });
   sourceService = new WorkbenchSourceService(databasePath);
-  registerSourceIpc(sourceService, uiOrigin);
   const apiPort = await localApi.start();
+  if (packagedSelfHosted) {
+    // The real origin depends on the ephemeral port chosen in start(); the
+    // security fields are only read per-request, so updating here is safe.
+    localApi.security.appOrigin = `http://127.0.0.1:${apiPort}`;
+  }
+  registerSourceIpc(sourceService, localApi.security.appOrigin);
+  const uiUrl = packagedSelfHosted ? new URL(`http://127.0.0.1:${apiPort}/`) : trustedUiUrl(overrideEnv!);
+  const uiOrigin = uiUrl.origin;
 
   const window = new BrowserWindow({
     width: 1440,

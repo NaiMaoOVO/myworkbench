@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Local-first personal work evidence cockpit",
+  "author": "MyWorkbench contributors",
   "type": "module",
   "main": "dist-electron/apps/desktop/main.js",
   "scripts": {
@@ -15,13 +16,13 @@
     "build:electron": "tsc -p tsconfig.electron.json && tsc -p tsconfig.preload.json",
     "build": "npm run typecheck && npm run build:web && npm run build:electron",
     "start": "electron .",
+    "dist:mac": "npm run build && electron-builder --mac --publish never",
+    "dist:win": "npm run build && electron-builder --win --publish never",
     "lint": "npm run typecheck"
   },
-  "dependencies": {
-    "react": "19.2.8",
-    "react-dom": "19.2.8"
-  },
   "devDependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "@types/node": "24.10.1",
     "@types/react": "19.2.7",
     "@types/react-dom": "19.2.3",

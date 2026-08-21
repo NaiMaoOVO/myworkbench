@@ -1,6 +1,8 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { once } from 'node:events';
+import { readFile, stat } from 'node:fs/promises';
+import { extname, join, normalize, resolve, sep } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import type { ContentScope } from '../core/types.js';
 import { createWorkbenchRuntime } from '../core/runtime.js';
@@ -17,6 +19,8 @@ export interface LocalApiOptions {
   appOrigin: string;
   installationSecret?: string;
   csrfToken?: string;
+  /** Packaged builds host the built UI from this directory on the same loopback origin. */
+  uiRoot?: string;
 }
 
 interface JsonObject {
@@ -34,6 +38,8 @@ export interface LocalApiResponse {
   status: number;
   headers: Record<string, string>;
   body: string;
+  /** Binary payload for static UI assets; takes precedence over `body`. */
+  raw?: Buffer;
 }
 
 const jsonLimit = 32 * 1024;
@@ -42,6 +48,7 @@ export class LocalApiServer {
   readonly security: ApiSecurity;
   readonly runtime;
   readonly #server: Server;
+  readonly #uiRoot: string | undefined;
 
   constructor(options: LocalApiOptions) {
     this.security = {
@@ -49,6 +56,7 @@ export class LocalApiServer {
       installationSecret: options.installationSecret ?? randomBytes(32).toString('base64url'),
       csrfToken: options.csrfToken ?? randomUUID(),
     };
+    this.#uiRoot = options.uiRoot ? resolve(options.uiRoot) : undefined;
     this.runtime = createWorkbenchRuntime(options.databasePath);
     this.#server = createServer((request, response) => void this.handle(request, response));
   }
@@ -80,7 +88,7 @@ export class LocalApiServer {
     }
     const result = await this.request({ method, url: request.url ?? '/', headers: request.headers, body });
     response.writeHead(result.status, result.headers);
-    response.end(result.body);
+    response.end(result.raw ?? result.body);
   }
 
   /**
@@ -108,6 +116,9 @@ export class LocalApiServer {
     }
 
     try {
+      if (method === 'GET' && this.#uiRoot && !url.pathname.startsWith('/api/') && url.pathname !== '/health') {
+        return await this.serveStatic(url, headers);
+      }
       if (method === 'GET') return this.handleRead(url, headers);
       if (!this.isAuthorizedControlRequest(requestHeaders)) return this.response(403, headers, { error: 'control_request_rejected' });
       if (typeof input.body === 'string' && Buffer.byteLength(input.body, 'utf8') > jsonLimit) throw new Error('Request body is too large.');
@@ -117,6 +128,52 @@ export class LocalApiServer {
       const message = error instanceof Error ? error.message : 'Unexpected local API error.';
       const code = message.includes('outside the authorized') ? 403 : message.includes('Unsupported') ? 404 : 400;
       return this.response(code, headers, { error: code === 403 ? 'grant_boundary_rejected' : 'invalid_request' });
+    }
+  }
+
+  private static readonly uiMime: Record<string, string> = {
+    '.html': 'text/html; charset=utf-8',
+    '.js': 'text/javascript; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.svg': 'image/svg+xml',
+    '.png': 'image/png',
+    '.ico': 'image/x-icon',
+    '.json': 'application/json',
+    '.woff2': 'font/woff2',
+    '.map': 'application/json',
+  };
+
+  /** Serves the packaged UI from disk. Only GET reaches this path; traversal
+   * outside uiRoot is rejected and unknown paths return a plain 404. */
+  private async serveStatic(url: URL, headers: Record<string, string>): Promise<LocalApiResponse> {
+    if (!this.#uiRoot) return this.response(404, headers, { error: 'not_found' });
+    let pathname: string;
+    try {
+      pathname = decodeURIComponent(url.pathname);
+    } catch {
+      return this.response(400, headers, { error: 'invalid_request' });
+    }
+    const relative = normalize(pathname).replace(/^([.][.](\\|\/|$))+/, '');
+    let target = join(this.#uiRoot, relative);
+    if (!resolve(target).startsWith(this.#uiRoot + sep) && resolve(target) !== this.#uiRoot) {
+      return this.response(403, headers, { error: 'path_rejected' });
+    }
+    try {
+      const info = await stat(target);
+      if (info.isDirectory()) target = join(target, 'index.html');
+      const body = await readFile(target);
+      const type = LocalApiServer.uiMime[extname(target)] ?? 'application/octet-stream';
+      const staticHeaders: Record<string, string> = {
+        ...headers,
+        'Content-Type': type,
+        'X-Content-Type-Options': 'nosniff',
+        'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'",
+      };
+      if (target.endsWith('.html')) staticHeaders['Cache-Control'] = 'no-store';
+      else staticHeaders['Cache-Control'] = 'public, max-age=86400';
+      return { status: 200, headers: staticHeaders, body: '', raw: body };
+    } catch {
+      return this.response(404, headers, { error: 'not_found' });
     }
   }
 
