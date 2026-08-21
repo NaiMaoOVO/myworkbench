@@ -1,7 +1,7 @@
 # M4 status — OLED cockpit and project rack
 
 **Updated:** August 22, 2026
-**Status:** partial; source-driven cockpit views implemented, visual/runtime acceptance remains.
+**Status:** real-runtime acceptance passed (32/32 checks); depth-entry behavior and cross-platform packaging remain.
 
 ## Implemented
 
@@ -17,14 +17,28 @@
 - The rack includes `listbox`/`option` semantics, visible focus handling, and a `prefers-reduced-motion` path that removes perspective and large movement.
 - Existing 320/375/768/1024/1440 responsive constraints remain in the shared layout; the rack collapses its detail and card geometry on smaller widths.
 
-## Remaining visual and interaction acceptance
+## Real-runtime acceptance (August 22, 2026)
 
-1. Run desktop visual tests against an actual Electron runtime at 320, 375, 768, 1024, 1440, and target-wide widths.
-2. Verify pointer drag and wheel selection in the desktop shell, including trackpads and touch input.
-3. Add new-project depth-entry behavior based on a real scan delta.
-4. Compare real-data screenshots against the supplied reference image and refine the optical material layers.
-5. Validate no page-level overflow, long-text behavior, empty/loading/error surfaces, high contrast, and 200% zoom in a browser/runtime capable of rendering the local app.
+A real Electron runtime harness (`scripts/acceptance/`) launched the packaged desktop shell against a loopback static build of `dist-web`, seeded through the genuine authorization + scan pipeline (claude/codex partial scans plus an exports-compat success scan with intentional malformed-line diagnostics).
+
+Result: **32 of 32 checks pass**, covering empty/loading/error surfaces, five viewport widths with zero page-level overflow, keyboard arrows/Home/End, wheel, pointer drag, reduced-motion geometry removal, long-text evidence, all four primary views at 1440 and 320 widths, content no-results state, and seeded-database readback. Screenshots and pixel statistics land in `.mw-local/acceptance/` (ignored).
+
+The acceptance run surfaced and fixed four real desktop-only defects:
+
+1. `package.json` pointed `main` at a non-existent `dist-electron/main.js`; the compiled entry lives at `dist-electron/apps/desktop/main.js`. The shell silently idled before this fix.
+2. The sandboxed preload was emitted as ESM, which sandboxed preloads cannot load; it now compiles separately as CommonJS (`tsconfig.preload.json`) so the source-authorisation bridge works.
+3. React registers wheel listeners passively, so the rack's wheel selection never fired in a real browser; it now uses a native non-passive listener.
+4. An empty database showed "Current evidence" with zeros instead of the no-indexed-evidence guidance because the derived `dataState` field counted as observed data; empty state is now detected explicitly.
+
+Programmatic palette comparison against the supplied reference: dark background share matches closely (reference ≈0.85, cockpit ≈0.89), while green accent coverage is higher in the app (~0.037 vs ~0.003 sampled). A human or image-capable review should confirm whether the selected-card glass and heat colours need restraint; screenshots are preserved locally for that review.
+
+## Remaining work
+
+1. Add new-project depth-entry behavior based on a real scan delta.
+2. Human/image-model visual review of materials and lighting against the reference image; refine optical layers if the green accent coverage is judged excessive.
+3. Implement the remaining source adapters: iFlow, ZCode, Kimi Code, Gemini, Hermes, OpenClaw.
+4. macOS/Windows packaging, install, restart recovery, uninstall verification, and push.
 
 ## Verification note
 
-The latest typecheck, production build, diff check, and full Vitest suite pass: 27 tests across 7 files. Local API integration tests use the same production dispatcher in process because this sandbox forbids loopback binding; the real HTTP listener remains reserved for platform/release smoke tests. Visual/runtime and cross-platform acceptance remain open.
+Latest typecheck, production build, diff check, and full Vitest suite pass: 27 tests across 7 files. Local API integration tests use the same production dispatcher in process. The real HTTP listener is now exercised end-to-end by the Electron acceptance harness described above; cross-platform release smoke tests remain open until packaging.

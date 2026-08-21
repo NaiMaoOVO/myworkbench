@@ -4,7 +4,7 @@
   "private": true,
   "description": "Local-first personal work evidence cockpit",
   "type": "module",
-  "main": "dist-electron/main.js",
+  "main": "dist-electron/apps/desktop/main.js",
   "scripts": {
     "dev:web": "vite",
     "dev:core": "tsx src/local-api/dev.ts",
@@ -12,7 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build:web": "vite build",
-    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:electron": "tsc -p tsconfig.electron.json && tsc -p tsconfig.preload.json",
     "build": "npm run typecheck && npm run build:web && npm run build:electron",
     "start": "electron .",
     "lint": "npm run typecheck"

@@ -27,7 +27,7 @@ async function createWindow(): Promise<void> {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
-      preload: join(import.meta.dirname, 'preload.js'),
+      preload: join(import.meta.dirname, '../../preload.js'),
     },
   });
 

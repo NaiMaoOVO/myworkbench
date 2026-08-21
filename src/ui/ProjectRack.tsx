@@ -79,6 +79,7 @@ export function ProjectRack({ refreshKey, onSelectionChange }: ProjectRackProps)
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [previousName, setPreviousName] = useState<string | null>(null);
   const dragStartX = useRef<number | null>(null);
+  const rackRef = useRef<HTMLDivElement | null>(null);
 
   const select = useCallback((name: string) => {
     setSelectedName((current) => {
@@ -124,6 +125,20 @@ export function ProjectRack({ refreshKey, onSelectionChange }: ProjectRackProps)
   }, [previousName]);
 
   useEffect(() => {
+    const node = rackRef.current;
+    if (!node) return;
+    // React attaches wheel listeners passively, which blocks preventDefault;
+    // the rack needs a native non-passive listener to own wheel selection.
+    const handleWheel = (event: WheelEvent) => {
+      if (Math.abs(event.deltaY) < 6 && Math.abs(event.deltaX) < 6) return;
+      event.preventDefault();
+      selectRelative(event.deltaY + event.deltaX > 0 ? 1 : -1);
+    };
+    node.addEventListener('wheel', handleWheel, { passive: false });
+    return () => node.removeEventListener('wheel', handleWheel);
+  }, [selectRelative]);
+
+  useEffect(() => {
     const project = projects.find((item) => item.name === selectedName) ?? null;
     onSelectionChange(project ? { project, events: events.filter((event) => event.workspace === project.name).slice(0, 8) } : null);
   }, [events, onSelectionChange, projects, selectedName]);
@@ -139,6 +154,7 @@ export function ProjectRack({ refreshKey, onSelectionChange }: ProjectRackProps)
         <p className="muted">Use arrow keys, the wheel, drag, or select a file card.</p>
       </div>
       <div
+        ref={rackRef}
         className="project-rack"
         role="listbox"
         aria-label="Project evidence rack"
@@ -149,11 +165,6 @@ export function ProjectRack({ refreshKey, onSelectionChange }: ProjectRackProps)
           if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') { event.preventDefault(); selectRelative(-1); }
           if (event.key === 'Home') { event.preventDefault(); select(projects[0].name); }
           if (event.key === 'End') { event.preventDefault(); select(projects.at(-1)!.name); }
-        }}
-        onWheel={(event) => {
-          if (Math.abs(event.deltaY) < 6 && Math.abs(event.deltaX) < 6) return;
-          event.preventDefault();
-          selectRelative(event.deltaY + event.deltaX > 0 ? 1 : -1);
         }}
         onPointerDown={(event) => { dragStartX.current = event.clientX; event.currentTarget.setPointerCapture(event.pointerId); }}
         onPointerUp={(event) => {

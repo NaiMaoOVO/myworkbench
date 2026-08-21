@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.electron.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "Node10",
+    "outDir": "dist-electron",
+    "rootDir": "apps/desktop"
+  },
+  "include": ["apps/desktop/preload.ts"]
+}

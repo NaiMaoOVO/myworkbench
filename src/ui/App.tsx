@@ -137,7 +137,8 @@ export function App() {
   const sources = runtime.sources.status === 'ready' && runtime.sources.data ? runtime.sources.data : [];
   const selectedSource = sources.find((source) => source.id === selectedSourceId) ?? null;
   const metrics = useMemo(() => runtime.dashboard.status === 'ready' && runtime.dashboard.data ? extractMetrics(runtime.dashboard.data) : [], [runtime.dashboard]);
-  const observedData = metrics.some((metric) => metric.value !== '0');
+  const dashboardData = runtime.dashboard.status === 'ready' && runtime.dashboard.data ? runtime.dashboard.data : null;
+  const observedData = dashboardData?.dataState === 'empty' ? false : metrics.some((metric) => metric.value !== '0');
   const loading = runtime.health.status === 'loading' || runtime.dashboard.status === 'loading';
   const hasError = runtime.health.status === 'error' || runtime.dashboard.status === 'error';
 
