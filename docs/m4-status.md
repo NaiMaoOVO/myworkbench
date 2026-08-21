@@ -32,6 +32,10 @@ The acceptance run surfaced and fixed four real desktop-only defects:
 
 Programmatic palette comparison against the supplied reference: dark background share matches closely (reference ≈0.85, cockpit ≈0.89), while green accent coverage is higher in the app (~0.037 vs ~0.003 sampled). A human or image-capable review should confirm whether the selected-card glass and heat colours need restraint; screenshots are preserved locally for that review.
 
+## Real installed-tool verification (August 22, 2026)
+
+The machine running this repository has real local data for one of the six newly covered tools: ZCode CLI keeps per-session model I/O logs under `~/.zcode/cli/rollout/`. The adapter was rewritten against the observed real format (multi-file JSONL rollouts, `startedAt`/`completedAt` columns, nested model descriptors, exchange bodies under `response.text`; project paths are absent from this format and workspace stays unset rather than guessed), the anonymous fixture was reshaped to match, and the full contract suite plus an end-to-end grant → preview → scan against the genuine directory passed: 45 records parsed with zero failures spanning a month of activity, metadata-only by default, bodies only after a separate grant. `.gemini`, `.iflow`, `.hermes`, and `.openclaw` exist locally but contain no session logs to verify against.
+
 ## Packaging and desktop lifecycle (M5, August 22, 2026)
 
 - The packaged shell now hosts the built UI itself: `LocalApiServer` optionally serves `dist-web` on the same loopback origin as the API (`uiRoot` option), with path-traversal rejection, strict CSP, and hashed-asset caching. Dev mode keeps the explicit loopback UI URL, and `MYWORKBENCH_UI_URL` remains a test override.
@@ -43,7 +47,7 @@ Programmatic palette comparison against the supplied reference: dark background 
 
 1. Add new-project depth-entry behavior based on a real scan delta.
 2. Human/image-model visual review of materials and lighting against the reference image; refine optical layers if the green accent coverage is judged excessive.
-3. Verify the agent adapters against real installed-tool data (contract fixtures are anonymous and synthetic by policy).
+3. Verify the remaining agent adapters (Gemini, iFlow, Hermes, Kimi Code, OpenClaw) against real installed-tool data as it becomes available; ZCode is verified.
 4. Configure the GitHub remote, push, and let CI produce the release artifacts; signing keys and notarization remain future work for public distribution.
 
 ## Agent adapter coverage (M3, August 22, 2026)
