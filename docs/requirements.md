@@ -97,6 +97,7 @@ Support platform-appropriate launch-at-login, scan frequency, data directory, di
 
 - All adapters implement the versioned protocol and pass anonymous fixture contract tests.
 - Security tests cover path traversal, out-of-grant symlinks, malicious Markdown, CSRF, loopback cross-origin control calls, and log redaction.
+- Local API route and security integration tests must be runnable without opening a socket by invoking the same production request handler in process. This is a test transport only, not a mock implementation; release smoke tests still verify loopback binding where the host permits it.
 - Regression tests cover the six read APIs, five primary views, and exports compatibility.
 - Validate desktop widths 1440 and target wide screen; responsive widths 320, 375, 768, and 1024.
 - Validate keyboard controls, focus, text scaling, high contrast, reduced motion, empty/loading/error states, long text, and no page-level horizontal overflow.

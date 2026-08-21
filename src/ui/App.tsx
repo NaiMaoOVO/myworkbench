@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ProjectRack, type ProjectSelection } from './ProjectRack';
 import { ActivityTimeline } from './ActivityTimeline';
+import { ContentView } from './ContentView';
+import { QualityView } from './QualityView';
 
 type JsonValue = null | boolean | number | string | JsonRecord | JsonValue[];
 type JsonRecord = { [key: string]: JsonValue };
@@ -14,6 +16,7 @@ type RequestState<T> =
 type Metric = { label: string; value: string };
 type SourceSummary = { id: string; displayName: string; state: string; supportsBodies: boolean; version: string };
 type OperationState = { busy: string | null; message: string | null; error: string | null };
+type ActiveView = 'overview' | 'content' | 'quality' | 'sources';
 
 type RuntimeState = {
   health: RequestState<JsonRecord>;
@@ -103,6 +106,7 @@ export function App() {
   const [operation, setOperation] = useState<OperationState>({ busy: null, message: null, error: null });
   const [projectSelection, setProjectSelection] = useState<ProjectSelection | null>(null);
   const [projectRefreshKey, setProjectRefreshKey] = useState(0);
+  const [activeView, setActiveView] = useState<ActiveView>('overview');
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setRuntime((current) => ({ ...current, health: { status: 'loading', data: null, error: null }, dashboard: { status: 'loading', data: null, error: null }, sources: { status: 'loading', data: null, error: null } }));
@@ -124,6 +128,10 @@ export function App() {
   }, [bridge]);
 
   useEffect(() => { const controller = new AbortController(); void load(controller.signal); return () => controller.abort(); }, [load]);
+
+  useEffect(() => {
+    if (activeView !== 'overview') setProjectSelection(null);
+  }, [activeView]);
 
   const refresh = useCallback(async () => { setRefreshing(true); try { await load(); setProjectRefreshKey((key) => key + 1); } finally { setRefreshing(false); } }, [load]);
   const sources = runtime.sources.status === 'ready' && runtime.sources.data ? runtime.sources.data : [];
@@ -149,6 +157,7 @@ export function App() {
       onSuccess?.(result);
       setOperation({ busy: null, message: `${readableLabel(name)} completed.`, error: null });
       await load();
+      setProjectRefreshKey((key) => key + 1);
     } catch (error) {
       setOperation({ busy: null, message: null, error: error instanceof Error ? error.message : 'The operation could not be completed.' });
     }
@@ -185,22 +194,28 @@ export function App() {
       <aside className="nav-pod" aria-label="Primary navigation">
         <div className="brand-mark" aria-hidden="true">MW</div>
         <nav>
-          <a className="nav-item nav-item--active" href="#workspace" aria-current="page"><span aria-hidden="true">◉</span>Overview</a>
-          <a className="nav-item" href="#sources"><span aria-hidden="true">◫</span>Sources</a>
-          <a className="nav-item" href="#service-state"><span aria-hidden="true">◇</span>Local service</a>
+          <button className={`nav-item ${activeView === 'overview' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('overview')} aria-current={activeView === 'overview' ? 'page' : undefined}><span aria-hidden="true">◉</span>Overview</button>
+          <button className={`nav-item ${activeView === 'content' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('content')} aria-current={activeView === 'content' ? 'page' : undefined}><span aria-hidden="true">◌</span>Content</button>
+          <button className={`nav-item ${activeView === 'quality' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('quality')} aria-current={activeView === 'quality' ? 'page' : undefined}><span aria-hidden="true">◇</span>Quality</button>
+          <button className={`nav-item ${activeView === 'sources' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('sources')} aria-current={activeView === 'sources' ? 'page' : undefined}><span aria-hidden="true">◫</span>Sources</button>
         </nav>
         <p className="nav-footnote">Local-first<br />Read-only sources</p>
       </aside>
 
       <section id="workspace" className="workspace" aria-labelledby="page-title" tabIndex={-1}>
-        <header className="workspace-header"><div><p className="eyebrow">Personal work evidence</p><h1 id="page-title">MyWorkbench</h1></div><button className="refresh-button" type="button" onClick={() => void refresh()} disabled={loading || refreshing}><span aria-hidden="true">↻</span>{refreshing ? 'Refreshing' : 'Refresh'}</button></header>
+        <header className="workspace-header"><div><p className="eyebrow">{activeView === 'overview' ? 'Personal work evidence' : readableLabel(activeView)}</p><h1 id="page-title">MyWorkbench</h1></div><button className="refresh-button" type="button" onClick={() => void refresh()} disabled={loading || refreshing}><span aria-hidden="true">↻</span>{refreshing ? 'Refreshing' : 'Refresh'}</button></header>
         <div className="sr-only" aria-live="polite" aria-atomic="true">{loading ? 'Loading local service and dashboard.' : hasError ? 'Some local data could not be loaded.' : operation.message ?? operation.error ?? 'Local dashboard updated.'}</div>
-        {loading ? <StatePanel title="Loading local evidence" detail="Checking the local service and reading the dashboard." /> : hasError ? <StatePanel title="Local data is unavailable" detail="The shell could not load one or more local read endpoints."><button className="text-button" type="button" onClick={() => void refresh()}>Try again</button></StatePanel> : !observedData ? <StatePanel title="No indexed evidence yet" detail="The local service is connected, but the dashboard has no visible evidence. Authorize a source and run a scan to populate this view." /> : <section id="data-state" className="dashboard-content" aria-label="Dashboard data"><div className="section-heading"><div><p className="eyebrow">Observed dashboard data</p><h2>Current evidence</h2></div>{runtime.refreshedAt ? <time dateTime={runtime.refreshedAt.toISOString()}>Updated just now</time> : null}</div><div className="metrics-grid">{metrics.map((metric) => <article className="metric-card" key={metric.label}><p>{metric.label}</p><strong>{metric.value}</strong></article>)}</div></section>}
-        <ProjectRack refreshKey={projectRefreshKey} onSelectionChange={setProjectSelection} />
-        <ActivityTimeline refreshKey={projectRefreshKey} />
+        {activeView === 'overview' ? <>
+          {loading ? <StatePanel title="Loading local evidence" detail="Checking the local service and reading the dashboard." /> : hasError ? <StatePanel title="Local data is unavailable" detail="The shell could not load one or more local read endpoints."><button className="text-button" type="button" onClick={() => void refresh()}>Try again</button></StatePanel> : !observedData ? <StatePanel title="No indexed evidence yet" detail="The local service is connected, but the dashboard has no visible evidence. Authorize a source and run a scan to populate this view." /> : <section id="data-state" className="dashboard-content" aria-label="Dashboard data"><div className="section-heading"><div><p className="eyebrow">Observed dashboard data</p><h2>Current evidence</h2></div>{runtime.refreshedAt ? <time dateTime={runtime.refreshedAt.toISOString()}>Updated just now</time> : null}</div><div className="metrics-grid">{metrics.map((metric) => <article className="metric-card" key={metric.label}><p>{metric.label}</p><strong>{metric.value}</strong></article>)}</div></section>}
+          <ProjectRack refreshKey={projectRefreshKey} onSelectionChange={setProjectSelection} />
+          <ActivityTimeline refreshKey={projectRefreshKey} />
+        </> : null}
+        {activeView === 'content' ? <ContentView refreshKey={projectRefreshKey} /> : null}
+        {activeView === 'quality' ? <QualityView refreshKey={projectRefreshKey} /> : null}
+        {activeView === 'sources' ? <section className="view-panel source-intro" aria-labelledby="source-intro-title"><p className="eyebrow">Source centre</p><h2 id="source-intro-title">Choose a source to inspect its read boundary</h2><p className="muted">The source list and authorization controls are shown below. Paths remain hidden from the page and are handled by the desktop bridge.</p></section> : null}
       </section>
 
-      <section id="sources" className="source-centre" aria-labelledby="sources-title">
+      {activeView === 'sources' ? <section id="sources" className="source-centre" aria-labelledby="sources-title">
         <div className="section-heading"><div><p className="eyebrow">Source centre</p><h2 id="sources-title">Read permissions are separate</h2></div><p className="muted">No folders are scanned until explicitly authorized.</p></div>
         {runtime.sources.status === 'loading' ? <p className="muted">Loading supported sources…</p> : null}
         {runtime.sources.status === 'error' ? <p className="error-copy">The source inventory could not be loaded.</p> : null}
@@ -216,7 +231,7 @@ export function App() {
             {operation.message ? <p className="operation-message" role="status">{operation.message}</p> : null}{operation.error ? <p className="error-copy" role="alert">{operation.error}</p> : null}
           </div>}
         </section> : null}
-      </section>
+      </section> : null}
 
       <aside id="service-state" className="evidence-panel" aria-labelledby="service-title"><div className="panel-header"><p className="eyebrow">{projectSelection ? 'Selected evidence' : 'Runtime'}</p><span className={runtime.health.status === 'ready' ? 'health-dot health-dot--ready' : 'health-dot'} aria-hidden="true" /></div>{projectSelection ? <><h2 id="service-title">{projectSelection.project.name}</h2><p className="service-status">{projectSelection.project.eventCount} observed events · latest {new Date(projectSelection.project.lastActivity).toLocaleString()}</p><ol className="evidence-events">{projectSelection.events.length ? projectSelection.events.map((event) => <li key={event.id}><time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleString()}</time><strong>{event.title}</strong><span>{readableLabel(event.sourceId)} · {readableLabel(event.type)}</span></li>) : <li className="muted">No directly linked event detail is available yet.</li>}</ol></> : <><h2 id="service-title">Local service</h2>{runtime.health.status === 'loading' ? <p className="muted">Checking health endpoint…</p> : null}{runtime.health.status === 'ready' && runtime.health.data ? <p className="service-status">{healthLabel(runtime.health.data)}</p> : null}{runtime.health.status === 'error' ? <p className="error-copy">{runtime.health.error}</p> : null}</>}<div className="privacy-note"><span aria-hidden="true">⌁</span><p>Desktop authorization uses a restricted native bridge. This page never receives control credentials or selected folder paths.</p></div><dl className="endpoint-list"><div><dt>Health</dt><dd>{runtime.health.status}</dd></div><div><dt>Dashboard</dt><dd>{runtime.dashboard.status}</dd></div><div><dt>Sources</dt><dd>{runtime.sources.status}</dd></div></dl></aside>
     </main>

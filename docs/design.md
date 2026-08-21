@@ -138,6 +138,7 @@ Only `previous` and `next` transition. New projects start from the far-right dep
 - Adapter contract: one anonymous fixture set per adapter, including unsupported versions and corrupted records.
 - Integration: grant → preview → scan → API → revoke/delete index.
 - Security: traversal, symlink escape, malicious markup, cross-origin loopback requests, token/CSRF rejection, redacted logs.
+- The local API owns one transport-neutral request dispatcher containing routing, authorization, bounded JSON parsing, CORS, and response shaping. The Node HTTP server is a thin adapter that binds only to `127.0.0.1` and forwards requests to that dispatcher. Integration tests call the same dispatcher directly when sandbox policy forbids opening loopback sockets; platform/release smoke tests still exercise the real HTTP listener.
 - UI: keyboard route, reduced-motion route, responsive screen sizes, stable card slots.
 - Platform: macOS and Windows installation, scan, restart recovery, and uninstall checked with real authorized data before release.
 
