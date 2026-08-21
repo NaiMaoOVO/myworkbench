@@ -28,10 +28,10 @@ describe('desktop source authorization service', () => {
     service.deleteIndex('exports-compat');
   });
 
-  it('does not create a selection for an unavailable adapter', async () => {
+  it('does not create a selection for an unknown adapter', async () => {
     const root = await mkdtemp(join(tmpdir(), 'mw-source-service-'));
     service = new WorkbenchSourceService(join(root, 'workbench.sqlite'));
-    await expect(service.createSelection('openclaw', root)).rejects.toThrow('not available');
-    expect(service.list()).toEqual(expect.arrayContaining([expect.objectContaining({ id: 'openclaw', state: 'unsupported' })]));
+    await expect(service.createSelection('unknown-agent', root)).rejects.toThrow('Unsupported source adapter');
+    expect(JSON.stringify(service.list())).not.toContain('unknown-agent');
   });
 });

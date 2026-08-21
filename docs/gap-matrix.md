@@ -14,7 +14,7 @@ This repository starts without source code. The supplied PRD describes a prior i
 | Read APIs | absent | dashboard, heatmap, events, projects, content, quality | complete | M1 |
 | Control APIs | secure loopback routes plus restricted Electron IPC grant/preview/scan/revoke/delete flow | sources/grants/scans/settings/diagnostics and persisted settings | partial: desktop runtime smoke test and settings persistence remain | M1/M2 |
 | Obsidian/Git/Codex/Claude | metadata-capable adapters with anonymous contract tests | native adapters plus secure UI authorization | partial: no real-data verification or UI controls | M2 |
-| Remaining agent tools | visible as explicit `unsupported` inventory entries | native adapters and diagnostics | complete parser/fixture work remains | M3 |
+| Remaining agent tools | native iFlow, ZCode, Kimi Code, Gemini, Hermes, OpenClaw adapters with anonymous contract fixtures | real-data verification against installed tools and UI controls | adapters and contract tests complete; installed-tool verification remains | M3 |
 | OLED cockpit UI | OLED layout, real-data source centre, fixed-slot project rack, evidence detail, activity, content, and data-quality views | full visual/system/device acceptance | partial: visual reference comparison and runtime validation remain | M4 |
 | Cross-platform packaging | absent | install/restart/uninstall workflows | complete | M5 |
 | Automated verification | absent | unit, contract, integration, security, UI regression | complete | M1–M5 |

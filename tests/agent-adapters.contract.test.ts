@@ -4,9 +4,15 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ClaudeAdapter } from '../src/adapters/claude-adapter.js';
 import { CodexAdapter } from '../src/adapters/codex-adapter.js';
+import { GeminiAdapter } from '../src/adapters/gemini-adapter.js';
+import { HermesAdapter } from '../src/adapters/hermes-adapter.js';
+import { IFlowAdapter } from '../src/adapters/iflow-adapter.js';
+import { KimiCodeAdapter } from '../src/adapters/kimi-code-adapter.js';
+import { OpenClawAdapter } from '../src/adapters/openclaw-adapter.js';
+import { ZCodeAdapter } from '../src/adapters/zcode-adapter.js';
 import type { AuthorizationGrant, SourceAdapter } from '../src/core/types.js';
 
-type AgentFixture = 'codex' | 'claude';
+type AgentFixture = 'codex' | 'claude' | 'iflow' | 'zcode' | 'kimi-code' | 'gemini' | 'hermes' | 'openclaw';
 
 async function fixtureGrant(sourceId: AgentFixture, scope: AuthorizationGrant['scope'] = 'metadata'): Promise<AuthorizationGrant> {
   const root = await mkdtemp(join(tmpdir(), `mw-${sourceId}-fixture-`));
@@ -18,6 +24,12 @@ function agentAdapterCases(): Array<{ sourceId: AgentFixture; adapter: SourceAda
   return [
     { sourceId: 'codex', adapter: new CodexAdapter() },
     { sourceId: 'claude', adapter: new ClaudeAdapter() },
+    { sourceId: 'iflow', adapter: new IFlowAdapter() },
+    { sourceId: 'zcode', adapter: new ZCodeAdapter() },
+    { sourceId: 'kimi-code', adapter: new KimiCodeAdapter() },
+    { sourceId: 'gemini', adapter: new GeminiAdapter() },
+    { sourceId: 'hermes', adapter: new HermesAdapter() },
+    { sourceId: 'openclaw', adapter: new OpenClawAdapter() },
   ];
 }
 

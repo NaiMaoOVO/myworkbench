@@ -36,8 +36,12 @@ Programmatic palette comparison against the supplied reference: dark background 
 
 1. Add new-project depth-entry behavior based on a real scan delta.
 2. Human/image-model visual review of materials and lighting against the reference image; refine optical layers if the green accent coverage is judged excessive.
-3. Implement the remaining source adapters: iFlow, ZCode, Kimi Code, Gemini, Hermes, OpenClaw.
+3. Verify the six new agent adapters against real installed-tool data (contract fixtures are anonymous and synthetic by policy).
 4. macOS/Windows packaging, install, restart recovery, uninstall verification, and push.
+
+## Agent adapter coverage (M3, August 22, 2026)
+
+iFlow, ZCode, Kimi Code, Gemini, Hermes, and OpenClaw now ship as native adapters instead of `unsupported` inventory placeholders. Each parses its `<sourceId>.jsonl` session log inside the granted folder, tolerates the column-name variants its tool has shipped (version-aware time/session keys), isolates malformed lines into safe diagnostics, and exposes bodies only under a per-source body grant. Kimi Code keeps an explicit product name so it never merges with Kimi desktop data; Hermes and OpenClaw keep tool names inside the record type; ZCode distinguishes session and plan records. All eight agent adapters share one anonymous contract suite (40 cases): no default discovery, preview/scan parity on valid and corrupt lines, metadata-only redaction, body-grant exposure, and no corrupt-content leakage into diagnostics.
 
 ## Verification note
 

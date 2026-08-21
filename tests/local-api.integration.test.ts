@@ -57,7 +57,7 @@ describe('local API authorization and scan lifecycle', () => {
       expect.objectContaining({ id: 'git' }),
       expect.objectContaining({ id: 'codex' }),
       expect.objectContaining({ id: 'claude' }),
-      expect.objectContaining({ id: 'openclaw', state: 'unsupported' }),
+      expect.objectContaining({ id: 'openclaw', state: 'awaiting_authorization' }),
     ]) });
 
     const rejected = await request('/api/sources/exports-compat/grants', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ root: fixtureRoot, scope: 'metadata' }) });
