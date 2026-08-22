@@ -11,7 +11,8 @@ let sourceService: WorkbenchSourceService | undefined;
 async function createWindow(): Promise<void> {
   // Packaged builds host the built UI from app resources on the same loopback
   // origin as the API; dev builds load an explicit loopback UI URL.
-  const overrideEnv = process.env.MYWORKBENCH_UI_URL;
+  // An empty-string variable must fall back to the default like an unset one.
+  const overrideEnv = process.env.MYWORKBENCH_UI_URL?.trim() || undefined;
   const packagedSelfHosted = app.isPackaged && !overrideEnv;
   const uiRoot = packagedSelfHosted ? join(app.getAppPath(), 'dist-web') : undefined;
   const placeholderOrigin = 'http://127.0.0.1:65535';
