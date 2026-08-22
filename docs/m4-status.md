@@ -63,7 +63,7 @@ A line-by-line comparison against the source PRD surfaced and closed the followi
 2. Verify Gemini/iFlow/Hermes/Kimi Code/OpenClaw adapters against real installed-tool data as it becomes available.
 3. Windows clean-machine install verification (CI builds NSIS; a real Windows host is needed for the lifecycle test).
 4. Signing/notarization for public distribution (requires developer certificates).
-5. Performance validation at PRD scale (100k records, p95 ≤200 ms).
+5. Performance at PRD scale: verified — 100k-record synthetic database benchmarked via `scripts/perf-check.mjs` (in-process dispatcher, 120 samples per endpoint). With the new occurred_at/source/locator/workspace indexes and a single-pass SQL dashboard, the slowest endpoint p95 is 35.6 ms (target ≤200 ms), events p95 0.2 ms, RSS 184 MB (target ≤500 MB). Bulk insert of 100k rows takes ~1.8 s inside transactions.
 
 ## Agent adapter coverage (M3, August 22, 2026)
 

@@ -74,6 +74,10 @@ const migration = `
     size INTEGER NOT NULL,
     PRIMARY KEY (source_id, file_key)
   );
+  CREATE INDEX IF NOT EXISTS idx_event_occurred_at ON event(occurred_at);
+  CREATE INDEX IF NOT EXISTS idx_event_source ON event(source_id);
+  CREATE INDEX IF NOT EXISTS idx_event_source_locator ON event(source_id, locator_hash);
+  CREATE INDEX IF NOT EXISTS idx_event_workspace ON event(workspace);
 `;
 
 export class WorkbenchDatabase {
@@ -153,6 +157,32 @@ export class WorkbenchDatabase {
       summary.endedAt,
       summary.sourceId,
     );
+  }
+
+  transaction(fn: () => void): void {
+    this.#db.exec('BEGIN');
+    try {
+      fn();
+      this.#db.exec('COMMIT');
+    } catch (error) {
+      this.#db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  /** Bulk insert for tooling and performance verification; same upsert semantics as addEvent. */
+  insertEventsBulk(records: NormalizedRecord[]): void {
+    const statement = this.#db.prepare(`
+      INSERT INTO event(id, source_id, occurred_at, event_type, title, workspace, body, locator_hash, fact_level)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        occurred_at = excluded.occurred_at, event_type = excluded.event_type, title = excluded.title,
+        workspace = excluded.workspace, body = excluded.body, fact_level = excluded.fact_level
+    `);
+    for (const record of records) {
+      const locatorHash = createHash('sha256').update(record.locator).digest('hex');
+      statement.run(record.id, record.sourceId, record.occurredAt, record.type, record.title, record.workspace, record.body, locatorHash, record.factLevel);
+    }
   }
 
   addEvent(record: NormalizedRecord): void {
@@ -250,43 +280,37 @@ export class WorkbenchDatabase {
   }
 
   dashboard(): Record<string, unknown> {
-    const count = this.#db.prepare('SELECT COUNT(*) AS count FROM event').get() as { count: number };
-    const projects = this.#db.prepare('SELECT COUNT(DISTINCT workspace) AS count FROM event WHERE workspace IS NOT NULL').get() as { count: number };
+    // 单遍 SQL 聚合（利用 occurred_at 索引），避免把全部事件拉到 JS 侧迭代。
     const now = Date.now();
-    const withinDays = (days: number): number => now - days * 86400000;
-    const rows = this.#db.prepare('SELECT source_id AS sourceId, occurred_at AS occurredAt, workspace FROM event').all() as Array<{ sourceId: string; occurredAt: string; workspace: string | null }>;
-    let events30 = 0;
-    let events90 = 0;
-    let commits30 = 0;
-    let contentActivity30 = 0;
-    let sessions30 = 0;
-    const activeProjects = new Set<string>();
-    for (const row of rows) {
-      const time = Date.parse(row.occurredAt);
-      if (Number.isNaN(time)) continue;
-      if (time >= withinDays(90)) events90 += 1;
-      if (time < withinDays(30)) continue;
-      events30 += 1;
-      if (row.sourceId === 'git') commits30 += 1;
-      if (row.sourceId === 'obsidian' || row.sourceId === 'exports-compat') contentActivity30 += 1;
-      if (!['git', 'obsidian', 'exports-compat'].includes(row.sourceId)) sessions30 += 1;
-      if (time >= withinDays(14) && row.workspace) activeProjects.add(row.workspace);
-    }
+    const d14 = new Date(now - 14 * 86400000).toISOString();
+    const d30 = new Date(now - 30 * 86400000).toISOString();
+    const d90 = new Date(now - 90 * 86400000).toISOString();
+    const row = this.#db.prepare(
+      'SELECT COUNT(*) AS eventCount, COUNT(DISTINCT CASE WHEN workspace IS NOT NULL THEN workspace END) AS projectCount, ' +
+      'SUM(CASE WHEN occurred_at >= ? THEN 1 ELSE 0 END) AS events30, ' +
+      'SUM(CASE WHEN occurred_at >= ? THEN 1 ELSE 0 END) AS events90, ' +
+      "SUM(CASE WHEN occurred_at >= ? AND source_id = 'git' THEN 1 ELSE 0 END) AS commits30, " +
+      "SUM(CASE WHEN occurred_at >= ? AND source_id IN ('obsidian', 'exports-compat') THEN 1 ELSE 0 END) AS contentActivity30, " +
+      "SUM(CASE WHEN occurred_at >= ? AND source_id NOT IN ('git', 'obsidian', 'exports-compat') THEN 1 ELSE 0 END) AS sessions30, " +
+      'COUNT(DISTINCT CASE WHEN occurred_at >= ? AND workspace IS NOT NULL THEN workspace END) AS activeProjects14d FROM event'
+    ).get(d30, d90, d30, d30, d14) as Record<string, number | null>;
+    const num = (value: number | null | undefined): number => value ?? 0;
+    const sessions30 = num(row.sessions30);
     // 工作分钟为估算口径：每条 AI 会话事件计 5 分钟；UI 必须随数字展示口径说明。
     const workMinutes30 = sessions30 * 5;
     return {
-      eventCount: count.count,
-      projectCount: projects.count,
-      dataState: count.count === 0 ? 'empty' : 'ready',
-      events30,
-      events90,
-      commits30,
-      contentActivity30,
-      activeProjects14d: activeProjects.size,
+      eventCount: num(row.eventCount),
+      projectCount: num(row.projectCount),
+      dataState: num(row.eventCount) === 0 ? 'empty' : 'ready',
+      events30: num(row.events30),
+      events90: num(row.events90),
+      commits30: num(row.commits30),
+      contentActivity30: num(row.contentActivity30),
+      activeProjects14d: num(row.activeProjects14d),
       workMinutes30,
       groups30: {
-        delivery: commits30,
-        creation: contentActivity30,
+        delivery: num(row.commits30),
+        creation: num(row.contentActivity30),
         sessions: sessions30,
       },
     };
