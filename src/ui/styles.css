@@ -393,3 +393,7 @@ time, .muted { color: #849187; font-size: .8rem; }
 .timeline-events--full li { grid-template-columns: 3.4rem 1fr auto; padding: .55rem .3rem; border-bottom: 1px solid rgba(220,255,231,.06); }
 @media (max-width: 1279px) { .timeline-view { grid-column: 1 / -1; } .heatmap-strip--wide { grid-template-columns: repeat(10, minmax(0, 1fr)); } }
 @media (max-width: 767px) { .heatmap-strip--wide { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
+
+.sync-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .6rem .9rem; margin-bottom: 1rem; border: 1px solid rgba(144,255,178,.18); border-radius: .85rem; background: rgba(21,230,109,.05); }
+.settings-note { margin: -.4rem 0 1rem; font-size: .75rem; }
+.content-snippet button { margin-left: .5rem; }

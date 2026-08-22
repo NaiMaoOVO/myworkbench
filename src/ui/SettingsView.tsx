@@ -85,6 +85,7 @@ export function SettingsView({ refreshKey }: { refreshKey: number }) {
             {Object.entries(frequencyLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
         </div>
+        <p className="muted settings-note">保存后立即按新频率调度；同步为增量式，未变更的来源几乎零开销。</p>
         <div className="settings-row">
           <span>语言</span><span className="muted">中文（简体）</span>
         </div>

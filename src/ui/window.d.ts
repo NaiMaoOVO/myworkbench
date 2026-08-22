@@ -22,6 +22,10 @@ declare global {
         get(): Promise<{ ok: boolean; value?: Record<string, string>; error?: string }>;
         set(key: string, value: string): Promise<{ ok: boolean; error?: string }>;
       };
+      sync: {
+        status(): Promise<{ ok: boolean; value?: { running: boolean; lastSyncAt: string | null; lastError: string | null }; error?: string }>;
+        runNow(): Promise<{ ok: boolean; value?: Array<{ sourceId: string; status: string; parsed: number; failed: number }>; error?: string }>;
+      };
     };
   }
 }

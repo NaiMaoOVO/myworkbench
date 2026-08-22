@@ -20,4 +20,8 @@ contextBridge.exposeInMainWorld('myWorkbench', {
     get: () => ipcRenderer.invoke('settings:get'),
     set: (key: string, value: string) => ipcRenderer.invoke('settings:set', key, value),
   },
+  sync: {
+    status: () => ipcRenderer.invoke('sync:status'),
+    runNow: () => ipcRenderer.invoke('sync:run-now'),
+  },
 });

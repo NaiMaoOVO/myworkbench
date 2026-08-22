@@ -3,10 +3,12 @@ import { join } from 'node:path';
 import { LocalApiServer } from '../../src/local-api/server.js';
 import { WorkbenchSourceService } from '../../src/core/source-service.js';
 import { registerSourceIpc } from './ipc.js';
+import { SyncScheduler } from '../../src/core/sync-scheduler.js';
 import { trustedUiUrl } from '../../src/platform/trusted-ui-url.js';
 
 let localApi: LocalApiServer | undefined;
 let sourceService: WorkbenchSourceService | undefined;
+let syncScheduler: SyncScheduler | undefined;
 
 async function createWindow(): Promise<void> {
   // Packaged builds host the built UI from app resources on the same loopback
@@ -19,14 +21,20 @@ async function createWindow(): Promise<void> {
   const initialOrigin = packagedSelfHosted ? placeholderOrigin : trustedUiUrl(overrideEnv ?? 'http://127.0.0.1:5173/').origin;
   const databasePath = join(app.getPath('userData'), 'workbench.sqlite');
   localApi = new LocalApiServer({ databasePath, appOrigin: initialOrigin, uiRoot });
-  sourceService = new WorkbenchSourceService(databasePath);
+  const service = new WorkbenchSourceService(databasePath);
+  sourceService = service;
   const apiPort = await localApi.start();
   if (packagedSelfHosted) {
     // The real origin depends on the ephemeral port chosen in start(); the
     // security fields are only read per-request, so updating here is safe.
     localApi.security.appOrigin = `http://127.0.0.1:${apiPort}`;
   }
-  registerSourceIpc(sourceService, localApi.security.appOrigin);
+  syncScheduler = new SyncScheduler(service, () => {
+    const stored = service.getSettings().scanFrequency;
+    return stored === 'manual' || stored === 'launch' || stored === '15min' ? stored : 'launch';
+  });
+  syncScheduler.start();
+  registerSourceIpc(service, localApi.security.appOrigin, syncScheduler);
   const uiUrl = packagedSelfHosted ? new URL(`http://127.0.0.1:${apiPort}/`) : trustedUiUrl(overrideEnv!);
   const uiOrigin = uiUrl.origin;
 
@@ -61,6 +69,7 @@ app.whenReady().then(createWindow).catch((error) => {
 
 app.on('window-all-closed', () => app.quit());
 app.on('before-quit', () => {
+  syncScheduler?.stop();
   sourceService?.close();
   void localApi?.stop();
 });

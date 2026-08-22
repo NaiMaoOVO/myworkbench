@@ -43,6 +43,10 @@ The machine running this repository has real local data for one of the six newly
 - Local verification on this machine: the packaged app launched in self-hosted mode (UI and API on one loopback origin), read the seeded database (11 events / 3 projects), kept the full source inventory (11 sources, six new adapters `awaiting_authorization`), survived a full stop/relaunch with identical data (restart recovery), and uninstalled cleanly with no workspace leftovers. The sandboxed Chromium flags used by the harness are environment accommodations, not product requirements.
 - `hdiutil` is denied inside this sandbox, so the DMG itself is produced by `.github/workflows/build.yml` (macOS DMG + Windows NSIS on tag push, tests gate the build). Local equivalent: `npm run dist:mac -c.directories.output=/tmp/myworkbench-release`.
 
+## Multi-source sync (August 22, 2026)
+
+多 Agent 会话同步落地为「自动增量同步」：`SyncScheduler` 在桌面外壳启动时按设置频率执行（手动 / 启动后一次 / 每 15 分钟），对全部已授权来源做增量读取（未变更文件零开销跳过）；来源中心新增同步状态行与「立即同步全部」；设置中的扫描频率保存后即时重排调度。启动同步已在打包应用中验证（lastSyncAt 写入、UI 状态行呈现、run-now 按钮完成一轮全源同步）。文件级实时监听超出 PRD 范围，未实现。
+
 ## Gap-closure round (August 22, 2026)
 
 A line-by-line comparison against the source PRD surfaced and closed the following gaps:

@@ -1,6 +1,7 @@
 import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { ContentScope } from '../../src/core/types.js';
 import { WorkbenchSourceService } from '../../src/core/source-service.js';
+import type { SyncScheduler } from '../../src/core/sync-scheduler.js';
 import { discoverCandidates } from '../../src/platform/discover.js';
 
 const sourceIdPattern = /^[a-z0-9-]{1,64}$/;
@@ -40,7 +41,7 @@ function safeError(error: unknown): { ok: false; error: string } {
   return { ok: false, error: safeMessages.has(message) ? message : 'The source operation could not be completed. Review the source selection and try again.' };
 }
 
-export function registerSourceIpc(service: WorkbenchSourceService, uiOrigin: string): void {
+export function registerSourceIpc(service: WorkbenchSourceService, uiOrigin: string, scheduler?: SyncScheduler): void {
   ipcMain.handle('sources:list', async (event) => {
     try {
       assertTrustedSender(event, uiOrigin);
@@ -140,7 +141,27 @@ export function registerSourceIpc(service: WorkbenchSourceService, uiOrigin: str
       assertTrustedSender(event, uiOrigin);
       if (typeof rawKey !== 'string' || typeof rawValue !== 'string') throw new Error('Invalid setting payload.');
       service.setSetting(rawKey, rawValue);
+      if (rawKey === 'scanFrequency') scheduler?.reschedule();
       return { ok: true } as const;
+    } catch (error) {
+      return safeError(error);
+    }
+  });
+
+  ipcMain.handle('sync:status', async (event) => {
+    try {
+      assertTrustedSender(event, uiOrigin);
+      return { ok: true, value: scheduler?.status() ?? { running: false, lastSyncAt: null, lastError: null } } as const;
+    } catch (error) {
+      return safeError(error);
+    }
+  });
+
+  ipcMain.handle('sync:run-now', async (event) => {
+    try {
+      assertTrustedSender(event, uiOrigin);
+      const summaries = scheduler ? await scheduler.runNow() : [];
+      return { ok: true, value: summaries } as const;
     } catch (error) {
       return safeError(error);
     }

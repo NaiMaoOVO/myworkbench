@@ -118,6 +118,45 @@ function StatePanel({ title, detail, children }: { title: string; detail: string
   return <section className="state-panel" aria-labelledby="state-title"><div className="state-indicator" aria-hidden="true" /><div><h2 id="state-title">{title}</h2><p>{detail}</p>{children}</div></section>;
 }
 
+function SyncStatusRow({ onChanged }: { onChanged: () => void }) {
+  const bridge = window.myWorkbench?.sync;
+  const [status, setStatus] = useState<{ running: boolean; lastSyncAt: string | null; lastError: string | null } | null>(null);
+
+  useEffect(() => {
+    if (!bridge) return;
+    let cancelled = false;
+    const poll = async () => {
+      const result = await bridge.status();
+      if (!cancelled && result.ok && result.value) setStatus(result.value);
+    };
+    void poll();
+    const timer = window.setInterval(poll, 20000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [bridge]);
+
+  if (!bridge) return <p className="muted sync-row">自动同步需要 MyWorkbench 桌面外壳；浏览器模式请在来源中心手动扫描。</p>;
+
+  const runNow = async () => {
+    setStatus((current) => ({ running: true, lastSyncAt: current?.lastSyncAt ?? null, lastError: null }));
+    const result = await bridge.runNow();
+    if (result.ok) {
+      const after = await bridge.status();
+      if (after.ok && after.value) setStatus(after.value);
+      onChanged();
+    }
+  };
+
+  return (
+    <div className="sync-row" role="status">
+      <span className="muted">
+        {status?.running ? '正在同步全部来源…' : status?.lastSyncAt ? '上次同步：' + new Date(status.lastSyncAt).toLocaleString('zh-CN') : '尚未同步'}
+        {status?.lastError ? ' · 上次错误：' + status.lastError : ''}
+      </span>
+      <button className="text-button" type="button" onClick={() => void runNow()} disabled={status?.running === true}>立即同步全部</button>
+    </div>
+  );
+}
+
 export function App() {
   const bridge = window.myWorkbench?.sources;
   const [runtime, setRuntime] = useState<RuntimeState>(initialState);
@@ -291,6 +330,7 @@ export function App() {
 
       {activeView === 'sources' ? <section id="sources" className="source-centre" aria-labelledby="sources-title">
         <div className="section-heading"><div><p className="eyebrow">来源中心</p><h2 id="sources-title">各来源的读取权限相互独立</h2></div><p className="muted">未明确授权前不会扫描任何文件夹。</p></div>
+        <SyncStatusRow onChanged={() => { void load(); setProjectRefreshKey((key) => key + 1); }} />
         {runtime.sources.status === 'loading' ? <p className="muted">正在加载支持的来源…</p> : null}
         {runtime.sources.status === 'error' ? <p className="error-copy">来源清单加载失败。</p> : null}
         {runtime.sources.status === 'ready' ? <ul className="source-grid" aria-label="支持的数据来源">{sources.map((source) => <li key={source.id} className="source-row"><div><strong>{source.displayName}</strong><span>{source.supportsBodies ? '默认仅元数据 · 正文需单独授权' : '仅元数据'}</span></div><div className="source-actions"><span className={`source-state source-state--${source.state}`}>{readableLabel(source.state)}</span><button type="button" className="source-manage" onClick={() => openSource(source)}>{source.state === 'unsupported' ? '详情' : '管理'}</button></div></li>)}</ul> : null}

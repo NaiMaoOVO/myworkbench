@@ -114,6 +114,11 @@ export class WorkbenchSourceService {
     this.#runtime.database.setSetting(key, value);
   }
 
+  /** 同步调度器记录最近一次同步时间；属于内部写入，不走用户设置白名单。 */
+  touchLastSync(iso: string): void {
+    this.#runtime.database.setSetting('lastSyncAt', iso);
+  }
+
   deleteIndex(sourceId: string): void {
     this.assertKnown(sourceId);
     this.#runtime.database.deleteSourceIndex(sourceId);
