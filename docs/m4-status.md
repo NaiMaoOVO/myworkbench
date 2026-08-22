@@ -64,6 +64,7 @@ A line-by-line comparison against the source PRD surfaced and closed the followi
 3. Windows clean-machine install verification (CI builds NSIS; a real Windows host is needed for the lifecycle test).
 4. Signing/notarization for public distribution (requires developer certificates).
 5. Performance at PRD scale: verified — 100k-record synthetic database benchmarked via `scripts/perf-check.mjs` (in-process dispatcher, 120 samples per endpoint). With the new occurred_at/source/locator/workspace indexes and a single-pass SQL dashboard, the slowest endpoint p95 is 35.6 ms (target ≤200 ms), events p95 0.2 ms, RSS 184 MB (target ≤500 MB). Bulk insert of 100k rows takes ~1.8 s inside transactions.
+6. 200% zoom reflow verified in the packaged runtime via a 720 px CSS viewport (the standard 1280-window equivalent): no horizontal overflow; symlink escape is already covered by tests/path-policy.test.ts.
 
 ## Agent adapter coverage (M3, August 22, 2026)
 
