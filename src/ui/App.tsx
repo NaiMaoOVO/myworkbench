@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { isRecord, readJson } from './api';
 import { ProjectRack, type ProjectSelection } from './ProjectRack';
 import { ActivityTimeline } from './ActivityTimeline';
 import { ContentView } from './ContentView';
 import { QualityView } from './QualityView';
 
-type JsonValue = null | boolean | number | string | JsonRecord | JsonValue[];
-type JsonRecord = { [key: string]: JsonValue };
 type ContentScope = 'metadata' | 'metadata_and_body';
 
 type RequestState<T> =
@@ -19,8 +18,8 @@ type OperationState = { busy: string | null; message: string | null; error: stri
 type ActiveView = 'overview' | 'content' | 'quality' | 'sources';
 
 type RuntimeState = {
-  health: RequestState<JsonRecord>;
-  dashboard: RequestState<JsonRecord>;
+  health: RequestState<Record<string, unknown>>;
+  dashboard: RequestState<Record<string, unknown>>;
   sources: RequestState<SourceSummary[]>;
   refreshedAt: Date | null;
 };
@@ -71,29 +70,6 @@ const operationLabels: Record<string, string> = {
   'delete index': '删除派生索引',
 };
 
-function isRecord(value: unknown): value is JsonRecord {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function apiBaseUrl(): string {
-  const url = new URL(window.location.href);
-  const candidate = url.searchParams.get('apiOrigin') ?? '';
-  try {
-    const parsed = new URL(candidate);
-    return ['127.0.0.1', '::1', 'localhost'].includes(parsed.hostname) ? parsed.origin : window.location.origin;
-  } catch {
-    return 'http://127.0.0.1:8788';
-  }
-}
-
-async function getJson(path: string, signal: AbortSignal): Promise<JsonRecord> {
-  const response = await fetch(new URL(path, apiBaseUrl()), { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal });
-  if (!response.ok) throw new Error(`本地服务响应了 ${response.status}。`);
-  const payload: unknown = await response.json();
-  if (!isRecord(payload)) throw new Error('本地服务返回了意外的响应格式。');
-  return payload;
-}
-
 function readableLabel(value: string): string {
   return stateLabels[value] ?? value.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase());
 }
@@ -107,7 +83,7 @@ function sourceSummaries(payload: unknown): SourceSummary[] {
   });
 }
 
-function extractMetrics(dashboard: JsonRecord): Metric[] {
+function extractMetrics(dashboard: Record<string, unknown>): Metric[] {
   const containers = [dashboard.metrics, dashboard.summary, dashboard.counts, dashboard.data, dashboard];
   const unique = new Map<string, Metric>();
   for (const container of containers) {
@@ -125,7 +101,7 @@ function extractMetrics(dashboard: JsonRecord): Metric[] {
   return [...unique.values()].slice(0, 4);
 }
 
-function healthLabel(health: JsonRecord): string {
+function healthLabel(health: Record<string, unknown>): string {
   const value = health.status ?? health.health ?? health.ok;
   if (value === true || value === 'ok' || value === 'healthy' || value === 'ready') return '本地服务就绪';
   return typeof value === 'string' ? readableLabel(value) : '本地服务已连接';
@@ -142,7 +118,7 @@ export function App() {
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [scope, setScope] = useState<ContentScope>('metadata');
   const [selectionHandle, setSelectionHandle] = useState<string | null>(null);
-  const [preview, setPreview] = useState<JsonRecord | null>(null);
+  const [preview, setPreview] = useState<Record<string, unknown> | null>(null);
   const [operation, setOperation] = useState<OperationState>({ busy: null, message: null, error: null });
   const [projectSelection, setProjectSelection] = useState<ProjectSelection | null>(null);
   const [projectRefreshKey, setProjectRefreshKey] = useState(0);
@@ -156,8 +132,8 @@ export function App() {
           if (!result.ok) throw new Error(result.error ?? '来源清单请求失败。');
           return sourceSummaries(result.sources ?? []);
         })
-      : getJson('/api/sources', activeSignal).then(sourceSummaries);
-    const [healthResult, dashboardResult, sourcesResult] = await Promise.allSettled([getJson('/health', activeSignal), getJson('/api/dashboard', activeSignal), sourceRequest]);
+      : readJson('/api/sources', activeSignal).then(sourceSummaries);
+    const [healthResult, dashboardResult, sourcesResult] = await Promise.allSettled([readJson('/health', activeSignal), readJson('/api/dashboard', activeSignal), sourceRequest]);
     if (signal?.aborted) return;
     setRuntime({
       health: healthResult.status === 'fulfilled' ? { status: 'ready', data: healthResult.value, error: null } : { status: 'error', data: null, error: healthResult.reason instanceof Error ? healthResult.reason.message : '健康检查失败。' },
@@ -171,6 +147,7 @@ export function App() {
 
   useEffect(() => {
     if (activeView !== 'overview') setProjectSelection(null);
+    document.title = activeView === 'overview' ? 'MyWorkbench 工作台' : `${viewLabels[activeView]} · MyWorkbench 工作台`;
   }, [activeView]);
 
   const refresh = useCallback(async () => { setRefreshing(true); try { await load(); setProjectRefreshKey((key) => key + 1); } finally { setRefreshing(false); } }, [load]);

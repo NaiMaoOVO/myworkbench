@@ -288,6 +288,8 @@ time, .muted { color: #849187; font-size: .8rem; }
 .project-card__sheet small, .project-card__sheet em { color: #4c6254; font-size: .65rem; font-style: normal; }
 .project-card__sheet strong { max-width: 16ch; color: #1a2d20; font-size: clamp(.92rem, 1.7vw, 1.25rem); line-height: 1.1; overflow-wrap: anywhere; }
 .project-card--slot { transform: rotateY(-29deg) translateZ(0); }
+.project-card--entering { animation: card-enter .55s cubic-bezier(.22,1,.36,1) both; animation-delay: var(--enter-delay, 0ms); }
+@keyframes card-enter { from { opacity: 0; transform: translate3d(26px, 18px, -160px) rotateY(-24deg); } }
 .project-card--current { z-index: 40; transform: translate3d(32px, -16px, 58px) rotateY(-4deg); transition: transform .36s cubic-bezier(.22,1,.36,1); }
 .project-card--current::before { border-color: rgba(144,255,178,.86); background: linear-gradient(145deg, rgba(80,177,106,.43), rgba(6,37,17,.7)); box-shadow: 15px 18px 32px rgba(0,0,0,.5), 0 0 28px rgba(74,255,131,.12), inset 0 1px rgba(218,255,226,.4); }
 .project-card--current .project-card__tab { color: #c8ffda; border-color: rgba(147,255,184,.66); background: #166832; }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { isRecord, readJson } from './api';
 
 type ContentItem = {
   id: string;
@@ -7,26 +8,10 @@ type ContentItem = {
   title: string;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function apiBaseUrl(): string {
-  const candidate = new URL(window.location.href).searchParams.get('apiOrigin') ?? '';
-  try {
-    const parsed = new URL(candidate);
-    return ['127.0.0.1', '::1', 'localhost'].includes(parsed.hostname) ? parsed.origin : window.location.origin;
-  } catch {
-    return 'http://127.0.0.1:8788';
-  }
-}
-
 async function readContent(signal: AbortSignal): Promise<ContentItem[]> {
-  const response = await fetch(new URL('/api/content', apiBaseUrl()), { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal });
-  if (!response.ok) throw new Error(`本地服务响应了 ${response.status}。`);
-  const payload: unknown = await response.json();
-  if (!isRecord(payload) || !Array.isArray(payload.content)) throw new Error('内容端点返回了意外的响应格式。');
-  return payload.content.flatMap((value) => {
+  const payload = await readJson('/api/content', signal);
+  if (!Array.isArray(payload.content)) throw new Error('内容端点返回了意外的响应格式。');
+  return payload.content.flatMap((value: unknown) => {
     if (!isRecord(value) || typeof value.id !== 'string' || typeof value.sourceId !== 'string' || typeof value.occurredAt !== 'string' || typeof value.title !== 'string') return [];
     return [{ id: value.id, sourceId: value.sourceId, occurredAt: value.occurredAt, title: value.title }];
   });

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { isRecord, readJson } from './api';
 
 export interface ProjectCard {
   name: string;
@@ -27,28 +28,6 @@ type ProjectRackProps = {
 };
 
 type RackState = 'loading' | 'ready' | 'error';
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function apiBaseUrl(): string {
-  const candidate = new URL(window.location.href).searchParams.get('apiOrigin') ?? '';
-  try {
-    const parsed = new URL(candidate);
-    return ['127.0.0.1', '::1', 'localhost'].includes(parsed.hostname) ? parsed.origin : window.location.origin;
-  } catch {
-    return 'http://127.0.0.1:8788';
-  }
-}
-
-async function readJson(path: string, signal: AbortSignal): Promise<Record<string, unknown>> {
-  const response = await fetch(new URL(path, apiBaseUrl()), { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal });
-  if (!response.ok) throw new Error(`本地服务响应了 ${response.status}。`);
-  const value: unknown = await response.json();
-  if (!isRecord(value)) throw new Error('The local service returned an unexpected response.');
-  return value;
-}
 
 function projectsFrom(value: Record<string, unknown>): ProjectCard[] {
   if (!Array.isArray(value.projects)) return [];
@@ -80,6 +59,26 @@ export function ProjectRack({ refreshKey, onSelectionChange }: ProjectRackProps)
   const [previousName, setPreviousName] = useState<string | null>(null);
   const dragStartX = useRef<number | null>(null);
   const rackRef = useRef<HTMLDivElement | null>(null);
+  const knownNames = useRef<Set<string> | null>(null);
+  const [enteringNames, setEnteringNames] = useState<string[]>([]);
+
+  // Cards fly in on first paint and whenever a scan surfaces a new project;
+  // the entering set clears after the animation window.
+  useEffect(() => {
+    if (projects.length === 0) return;
+    const names = projects.map((project) => project.name);
+    if (knownNames.current === null) {
+      knownNames.current = new Set(names);
+      setEnteringNames(names);
+    } else {
+      const fresh = names.filter((name) => !knownNames.current!.has(name));
+      knownNames.current = new Set(names);
+      if (fresh.length === 0) return;
+      setEnteringNames(fresh);
+    }
+    const timer = window.setTimeout(() => setEnteringNames([]), 1100);
+    return () => window.clearTimeout(timer);
+  }, [projects]);
 
   const select = useCallback((name: string) => {
     setSelectedName((current) => {
@@ -178,14 +177,15 @@ export function ProjectRack({ refreshKey, onSelectionChange }: ProjectRackProps)
         <div className="rack-slots" aria-hidden="true" />
         {projects.slice(0, 8).map((project, index) => {
           const stateClass = project.name === selectedName ? 'project-card--current' : project.name === previousName ? 'project-card--previous' : 'project-card--slot';
+          const enteringClass = enteringNames.includes(project.name) ? ' project-card--entering' : '';
           return <button
             id={`project-card-${project.name}`}
             key={project.name}
             type="button"
             role="option"
             aria-selected={project.name === selectedName}
-            className={`project-card ${stateClass}`}
-            style={{ '--slot': index } as React.CSSProperties}
+            className={`project-card ${stateClass}${enteringClass}`}
+            style={{ '--slot': index, '--enter-delay': `${index * 70}ms` } as React.CSSProperties}
             onClick={() => select(project.name)}
           >
             <span className="project-card__tab">{String(index + 1).padStart(2, '0')}</span>
