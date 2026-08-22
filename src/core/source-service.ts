@@ -7,7 +7,7 @@ import { canonicalizeGrantRoot } from '../platform/path-policy.js';
 
 const selectionLifetimeMs = 2 * 60 * 1000;
 
-const allowedSettings = new Set(['scanFrequency', 'launchAtLogin', 'language']);
+const allowedSettings = new Set(['scanFrequency', 'launchAtLogin', 'language', 'wizardCompleted']);
 
 export interface DirectorySelection {
   handle: string;

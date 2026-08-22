@@ -6,6 +6,7 @@ import { ContentView } from './ContentView';
 import { QualityView } from './QualityView';
 import { ProjectsView } from './ProjectsView';
 import { SettingsView } from './SettingsView';
+import { FirstRunWizard } from './FirstRunWizard';
 
 type ContentScope = 'metadata' | 'metadata_and_body';
 
@@ -129,6 +130,7 @@ export function App() {
   const [activeView, setActiveView] = useState<ActiveView>('overview');
   const [insightRange, setInsightRange] = useState<30 | 90>(30);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setRuntime((current) => ({ ...current, health: { status: 'loading', data: null, error: null }, dashboard: { status: 'loading', data: null, error: null }, sources: { status: 'loading', data: null, error: null } }));
@@ -156,6 +158,15 @@ export function App() {
     if (activeView !== 'overview') setProjectSelection(null);
     document.title = activeView === 'overview' ? 'MyWorkbench 工作台' : `${viewLabels[activeView]} · MyWorkbench 工作台`;
   }, [activeView]);
+
+  // 首次启动（桌面外壳且未完成过向导）时显示授权向导。
+  useEffect(() => {
+    void (async () => {
+      if (!window.myWorkbench?.settings) return;
+      const result = await window.myWorkbench.settings.get();
+      if (result.ok && result.value?.wizardCompleted !== 'true') setWizardOpen(true);
+    })();
+  }, []);
 
   // 指针流光：把指针位置写入卡片 CSS 变量，高光随之移动。
   useEffect(() => {
@@ -229,6 +240,7 @@ export function App() {
 
   return (
     <main className="cockpit-shell">
+      {wizardOpen ? <FirstRunWizard onComplete={() => setWizardOpen(false)} /> : null}
       <a className="skip-link" href="#workspace">跳到工作区</a>
       <aside className="nav-pod" aria-label="主导航">
         <div className="brand-mark" aria-hidden="true">MW</div>

@@ -369,3 +369,19 @@ time, .muted { color: #849187; font-size: .8rem; }
 .content-snippet { margin: .2rem 0; font-size: .78rem; line-height: 1.5; }
 .scan-status--cancelled { color: #c8d7cc; border-color: rgba(200,215,204,.4); }
 .scan-status--active, .scan-status--review, .scan-status--archived { color: #87968b; border-color: rgba(135,150,139,.35); }
+
+/* First-run wizard */
+.wizard-overlay { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 1.5rem; background: rgba(1,3,2,.82); backdrop-filter: blur(6px); }
+.wizard-panel { width: min(640px, 100%); max-height: 86vh; overflow-y: auto; padding: 2rem 2.2rem; border: 1px solid rgba(220,255,231,.18); border-radius: 1.25rem; background: linear-gradient(160deg, rgba(10,20,14,.97), rgba(4,9,6,.97)); box-shadow: 0 30px 80px rgba(0,0,0,.65), inset 0 1px rgba(255,255,255,.08); }
+.wizard-panel h1 { font-size: 1.5rem; color: #eafff1; margin: .2rem 0 .8rem; }
+.wizard-lede { color: #c8d7cc; margin-bottom: 1rem; }
+.wizard-promises { display: grid; gap: .55rem; margin: 0 0 1.5rem; padding: 0; list-style: none; color: #c8d7cc; font-size: .92rem; line-height: 1.55; }
+.wizard-actions { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.4rem; align-items: center; }
+.wizard-candidates { display: grid; gap: .5rem; margin: 1rem 0; padding: 0; list-style: none; }
+.wizard-candidate { display: flex; align-items: center; gap: .7rem; padding: .75rem .85rem; border: 1px solid rgba(220,255,231,.12); border-radius: .8rem; background: rgba(0,0,0,.2); cursor: pointer; }
+.wizard-candidate:hover { border-color: rgba(144,255,178,.4); }
+.wizard-candidate span { display: grid; gap: .15rem; }
+.wizard-candidate small { color: #87968b; word-break: break-all; }
+.wizard-outcomes { display: grid; gap: .5rem; margin: 0 0 1rem; padding: 0; list-style: none; }
+.wizard-outcomes li { display: flex; align-items: center; justify-content: space-between; padding: .6rem .8rem; border: 1px solid rgba(220,255,231,.1); border-radius: .7rem; background: rgba(0,0,0,.2); }
+@media (max-width: 767px) { .wizard-overlay { padding: .8rem; } .wizard-panel { padding: 1.4rem 1.2rem; } }
