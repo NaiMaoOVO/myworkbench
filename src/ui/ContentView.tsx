@@ -48,6 +48,7 @@ function displayDate(value: string): string {
 export function ContentView({ refreshKey }: { refreshKey: number }) {
   const [items, setItems] = useState<ContentItem[]>([]);
   const [query, setQuery] = useState('');
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
 
   useEffect(() => {
@@ -89,7 +90,7 @@ export function ContentView({ refreshKey }: { refreshKey: number }) {
               <time dateTime={item.occurredAt}>{displayDate(item.occurredAt)}</time>
               <div>
                 <strong>{item.title}</strong>
-                {item.body ? <p className="muted content-snippet">{item.body.slice(0, 200)}{item.body.length > 200 ? '…' : ''}</p> : null}
+                {item.body ? <p className="muted content-snippet">{expandedId === item.id || item.body.length <= 200 ? item.body : item.body.slice(0, 200) + '…'}{item.body.length > 200 ? <button className="text-button" type="button" onClick={() => setExpandedId((current) => (current === item.id ? null : item.id))}>{expandedId === item.id ? '收起' : '展开全文'}</button> : null}</p> : null}
                 <span>{item.sourceId} · {item.permission === 'body_authorized' ? '含已授权正文' : '仅元数据'}</span>
               </div>
             </li>

@@ -189,11 +189,12 @@ export class LocalApiServer {
         .map((source) => source.id)
         .filter((sourceId) => this.runtime.database.getGrant(sourceId)?.scope === 'metadata_and_body'),
     );
+    const bodyById = this.runtime.database.getBodiesForSources([...bodyGranted]);
     const items: Array<Record<string, unknown>> = [];
     for (const row of this.runtime.database.listEvents(2000)) {
       const sourceId = String(row.sourceId);
       const includeBody = bodyGranted.has(sourceId);
-      const body = includeBody ? this.runtime.database.getEventBody(String(row.id)) : null;
+      const body = includeBody ? bodyById.get(String(row.id)) ?? null : null;
       const haystack = `${String(row.title)} ${sourceId} ${String(row.occurredAt)} ${body ?? ""}`.toLocaleLowerCase();
       if (query && !haystack.includes(query)) continue;
       items.push({
@@ -211,7 +212,7 @@ export class LocalApiServer {
     const path = url.pathname;
     if (path === '/health') return this.response(200, headers, { status: 'ready', storage: 'ready' });
     if (path === '/api/dashboard') return this.response(200, headers, this.runtime.database.dashboard());
-    if (path === '/api/heatmap') return this.response(200, headers, { events: this.runtime.database.listEvents(1000).map((event) => ({ occurredAt: event.occurredAt, sourceId: event.sourceId })) });
+    if (path === '/api/heatmap') return this.response(200, headers, { events: this.runtime.database.listEvents(1000).map((event) => ({ occurredAt: event.occurredAt, sourceId: event.sourceId })), dailyCounts: this.runtime.database.heatmapDaily(14) });
     if (path === '/api/events') return this.response(200, headers, { events: this.runtime.database.listEvents() });
     if (path === '/api/projects') return this.response(200, headers, { projects: projectsFromEvents(this.runtime.database.listEvents(1000)) });
     if (path === '/api/content') return this.response(200, headers, { content: this.contentItems(url) });

@@ -5,6 +5,8 @@ type TimelineEvent = { id: string; sourceId: string; occurredAt: string; type: s
 
 type Day = { key: string; label: string; count: number };
 
+type DailyCount = { day: string; count: number };
+
 function eventList(payload: Record<string, unknown>): TimelineEvent[] {
   if (!Array.isArray(payload.events)) return [];
   return payload.events.flatMap((item) => {
@@ -17,19 +19,16 @@ function dateKey(value: string): string {
   return new Date(value).toLocaleDateString('en-CA');
 }
 
-function buildDays(events: TimelineEvent[]): Day[] {
-  const anchor = events.at(0) ? new Date(events[0].occurredAt) : new Date();
-  const counts = new Map<string, number>();
-  for (const event of events) {
-    const key = dateKey(event.occurredAt);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  return Array.from({ length: 14 }, (_, offset) => {
-    const date = new Date(anchor);
-    date.setDate(date.getDate() - (13 - offset));
+function buildDays(dailyCounts: DailyCount[]): Day[] {
+  // 服务端 SQL 聚合的逐日计数；缺失日期补零，保证连续十四天。
+  const counts = new Map(dailyCounts.map((row) => [row.day, row.count]));
+  const days: Day[] = [];
+  for (let offset = 13; offset >= 0; offset -= 1) {
+    const date = new Date(Date.now() - offset * 86400000);
     const key = date.toLocaleDateString('en-CA');
-    return { key, label: date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }), count: counts.get(key) ?? 0 };
-  });
+    days.push({ key, label: date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }), count: counts.get(key) ?? 0 });
+  }
+  return days;
 }
 
 function label(value: string): string {
@@ -38,6 +37,7 @@ function label(value: string): string {
 
 export function ActivityTimeline({ refreshKey }: { refreshKey: number }) {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
+  const [dailyCounts, setDailyCounts] = useState<DailyCount[]>([]);
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
@@ -45,8 +45,12 @@ export function ActivityTimeline({ refreshKey }: { refreshKey: number }) {
     const controller = new AbortController();
     setState('loading');
     Promise.all([readJson('/api/heatmap', controller.signal), readJson('/api/events', controller.signal)])
-      .then(([, eventPayload]) => {
+      .then(([heatmapPayload, eventPayload]) => {
         if (controller.signal.aborted) return;
+        const daily: DailyCount[] = Array.isArray(heatmapPayload.dailyCounts)
+          ? heatmapPayload.dailyCounts.flatMap((row) => (isRecord(row) && typeof row.day === 'string' && typeof row.count === 'number' ? [{ day: row.day, count: row.count }] : []))
+          : [];
+        setDailyCounts(daily);
         const next = eventList(eventPayload);
         setEvents(next);
         setSelectedDay(next.at(0) ? dateKey(next[0].occurredAt) : null);
@@ -56,7 +60,7 @@ export function ActivityTimeline({ refreshKey }: { refreshKey: number }) {
     return () => controller.abort();
   }, [refreshKey]);
 
-  const days = useMemo(() => buildDays(events), [events]);
+  const days = useMemo(() => buildDays(dailyCounts), [dailyCounts]);
   const selectedEvents = selectedDay ? events.filter((event) => dateKey(event.occurredAt) === selectedDay) : [];
   if (state === 'loading') return <section className="timeline-panel" aria-live="polite">正在加载观测活动…</section>;
   if (state === 'error' || events.length === 0) return null;

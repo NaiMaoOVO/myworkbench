@@ -52,6 +52,7 @@ export interface RawRecord {
   title: string;
   workspace?: string;
   body?: string;
+  durationMs?: number | null;
   locator: string;
 }
 
@@ -63,6 +64,8 @@ export interface NormalizedRecord {
   title: string;
   workspace: string | null;
   body: string | null;
+  /** 实际持续毫秒数；来源提供时用于真实工作时长统计。 */
+  durationMs?: number | null;
   locator: string;
   factLevel: FactLevel;
 }

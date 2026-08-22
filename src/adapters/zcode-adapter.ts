@@ -35,6 +35,8 @@ function asRawRecord(value: unknown, locator: string, includeBody: boolean): Raw
   const response = row.response && typeof row.response === 'object' ? row.response : undefined;
   const bodyText = optionalString(response, 'text');
 
+  const durationRaw = typeof row.durationMs === 'number' ? row.durationMs : null;
+
   return {
     id,
     time,
@@ -42,6 +44,7 @@ function asRawRecord(value: unknown, locator: string, includeBody: boolean): Raw
     title: `ZCode ${type}${modelId ? ` · ${modelId}` : ''}`,
     workspace: undefined,
     body: includeBody && bodyText ? bodyText : undefined,
+    durationMs: durationRaw,
     locator,
   };
 }
@@ -121,6 +124,7 @@ export class ZCodeAdapter implements SourceAdapter {
       title: raw.title,
       workspace: raw.workspace ?? null,
       body: raw.body ?? null,
+      durationMs: raw.durationMs ?? null,
       locator: raw.locator,
       factLevel: 'observed',
     };

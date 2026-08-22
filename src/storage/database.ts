@@ -90,6 +90,11 @@ export class WorkbenchDatabase {
     this.#db = new DatabaseSync(path);
     this.#db.exec(migration);
     this.#db.prepare('INSERT OR IGNORE INTO schema_migration(version, applied_at) VALUES (1, ?)').run(new Date().toISOString());
+    // v2 列扩展：会话实际时长（毫秒）。ALTER 无 IF NOT EXISTS，用 pragma 守卫。
+    const columns = this.#db.prepare('PRAGMA table_info(event)').all() as Array<{ name: string }>;
+    if (!columns.some((column) => column.name === 'duration_ms')) {
+      this.#db.exec('ALTER TABLE event ADD COLUMN duration_ms INTEGER');
+    }
   }
 
   close(): void {
@@ -173,25 +178,25 @@ export class WorkbenchDatabase {
   /** Bulk insert for tooling and performance verification; same upsert semantics as addEvent. */
   insertEventsBulk(records: NormalizedRecord[]): void {
     const statement = this.#db.prepare(`
-      INSERT INTO event(id, source_id, occurred_at, event_type, title, workspace, body, locator_hash, fact_level)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO event(id, source_id, occurred_at, event_type, title, workspace, body, locator_hash, fact_level, duration_ms)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         occurred_at = excluded.occurred_at, event_type = excluded.event_type, title = excluded.title,
-        workspace = excluded.workspace, body = excluded.body, fact_level = excluded.fact_level
+        workspace = excluded.workspace, body = excluded.body, fact_level = excluded.fact_level, duration_ms = excluded.duration_ms
     `);
     for (const record of records) {
       const locatorHash = createHash('sha256').update(record.locator).digest('hex');
-      statement.run(record.id, record.sourceId, record.occurredAt, record.type, record.title, record.workspace, record.body, locatorHash, record.factLevel);
+      statement.run(record.id, record.sourceId, record.occurredAt, record.type, record.title, record.workspace, record.body, locatorHash, record.factLevel, record.durationMs ?? null);
     }
   }
 
   addEvent(record: NormalizedRecord): void {
     const locatorHash = createHash('sha256').update(record.locator).digest('hex');
     this.#db.prepare(`
-      INSERT INTO event(id, source_id, occurred_at, event_type, title, workspace, body, locator_hash, fact_level)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET occurred_at = excluded.occurred_at, event_type = excluded.event_type, title = excluded.title, workspace = excluded.workspace, body = excluded.body, locator_hash = excluded.locator_hash, fact_level = excluded.fact_level
-    `).run(record.id, record.sourceId, record.occurredAt, record.type, record.title, record.workspace, record.body, locatorHash, record.factLevel);
+      INSERT INTO event(id, source_id, occurred_at, event_type, title, workspace, body, locator_hash, fact_level, duration_ms)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET occurred_at = excluded.occurred_at, event_type = excluded.event_type, title = excluded.title, workspace = excluded.workspace, body = excluded.body, locator_hash = excluded.locator_hash, fact_level = excluded.fact_level, duration_ms = excluded.duration_ms
+    `).run(record.id, record.sourceId, record.occurredAt, record.type, record.title, record.workspace, record.body, locatorHash, record.factLevel, record.durationMs ?? null);
   }
 
   addDiagnostic(diagnostic: Diagnostic): void {
@@ -265,6 +270,28 @@ export class WorkbenchDatabase {
     }
   }
 
+  /** 最近 days 天的逐日事件计数（SQL 聚合，含今日），供热力图直接渲染。 */
+  heatmapDaily(days = 14): Array<{ day: string; count: number }> {
+    const since = new Date(Date.now() - (days - 1) * 86400000);
+    since.setHours(0, 0, 0, 0);
+    const rows = this.#db.prepare(`
+      SELECT substr(occurred_at, 1, 10) AS day, COUNT(*) AS count
+      FROM event WHERE occurred_at >= ?
+      GROUP BY day ORDER BY day
+    `).all(since.toISOString()) as Array<{ day: string; count: number }>;
+    return rows;
+  }
+
+  /** 一次查询取回多个已授权来源的正文映射，避免内容列表逐行查询。 */
+  getBodiesForSources(sourceIds: string[]): Map<string, string | null> {
+    const map = new Map<string, string | null>();
+    if (sourceIds.length === 0) return map;
+    const placeholders = sourceIds.map(() => '?').join(', ');
+    const rows = this.#db.prepare(`SELECT id, body FROM event WHERE source_id IN (${placeholders})`).all(...sourceIds) as Array<{ id: string; body: string | null }>;
+    for (const row of rows) map.set(row.id, row.body);
+    return map;
+  }
+
   getEventBody(id: string): string | null {
     const row = this.#db.prepare('SELECT body FROM event WHERE id = ?').get(id) as { body: string | null } | undefined;
     return row?.body ?? null;
@@ -292,12 +319,17 @@ export class WorkbenchDatabase {
       "SUM(CASE WHEN occurred_at >= ? AND source_id = 'git' THEN 1 ELSE 0 END) AS commits30, " +
       "SUM(CASE WHEN occurred_at >= ? AND source_id IN ('obsidian', 'exports-compat') THEN 1 ELSE 0 END) AS contentActivity30, " +
       "SUM(CASE WHEN occurred_at >= ? AND source_id NOT IN ('git', 'obsidian', 'exports-compat') THEN 1 ELSE 0 END) AS sessions30, " +
-      'COUNT(DISTINCT CASE WHEN occurred_at >= ? AND workspace IS NOT NULL THEN workspace END) AS activeProjects14d FROM event'
-    ).get(d30, d90, d30, d30, d14) as Record<string, number | null>;
+      'COUNT(DISTINCT CASE WHEN occurred_at >= ? AND workspace IS NOT NULL THEN workspace END) AS activeProjects14d, ' +
+      "SUM(CASE WHEN occurred_at >= ? AND source_id NOT IN ('git', 'obsidian', 'exports-compat') AND duration_ms IS NOT NULL THEN duration_ms ELSE 0 END) AS measuredMs30, " +
+      "SUM(CASE WHEN occurred_at >= ? AND source_id NOT IN ('git', 'obsidian', 'exports-compat') AND duration_ms IS NULL THEN 1 ELSE 0 END) AS estimatedSessions30 FROM event"
+    ).get(d30, d90, d30, d30, d30, d14, d30, d30) as Record<string, number | null>;
     const num = (value: number | null | undefined): number => value ?? 0;
     const sessions30 = num(row.sessions30);
-    // 工作分钟为估算口径：每条 AI 会话事件计 5 分钟；UI 必须随数字展示口径说明。
-    const workMinutes30 = sessions30 * 5;
+    // 工作分钟：优先汇总来源提供的实际时长；无时长的会话按每条 5 分钟估算。UI 展示口径。
+    const measuredMinutes30 = num(row.measuredMs30) / 60000;
+    const estimatedSessions30 = num(row.estimatedSessions30);
+    const workMinutes30 = Math.round(measuredMinutes30 + estimatedSessions30 * 5);
+    const workMinutesSource = num(row.measuredMs30) > 0 ? '实测+估算混合' : '估算（每条会话 5 分钟）';
     return {
       eventCount: num(row.eventCount),
       projectCount: num(row.projectCount),
@@ -308,6 +340,7 @@ export class WorkbenchDatabase {
       contentActivity30: num(row.contentActivity30),
       activeProjects14d: num(row.activeProjects14d),
       workMinutes30,
+      workMinutesSource,
       groups30: {
         delivery: num(row.commits30),
         creation: num(row.contentActivity30),
