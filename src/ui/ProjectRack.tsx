@@ -44,7 +44,7 @@ function apiBaseUrl(): string {
 
 async function readJson(path: string, signal: AbortSignal): Promise<Record<string, unknown>> {
   const response = await fetch(new URL(path, apiBaseUrl()), { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal });
-  if (!response.ok) throw new Error(`The local service responded with ${response.status}.`);
+  if (!response.ok) throw new Error(`本地服务响应了 ${response.status}。`);
   const value: unknown = await response.json();
   if (!isRecord(value)) throw new Error('The local service returned an unexpected response.');
   return value;
@@ -68,7 +68,7 @@ function eventsFrom(value: Record<string, unknown>): EvidenceEvent[] {
 
 function formatDate(value: string): string {
   const date = new Date(value);
-  return Number.isNaN(date.valueOf()) ? 'Unknown activity time' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return Number.isNaN(date.valueOf()) ? '活动时间未知' : date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
 }
 
 export function ProjectRack({ refreshKey, onSelectionChange }: ProjectRackProps) {
@@ -143,21 +143,21 @@ export function ProjectRack({ refreshKey, onSelectionChange }: ProjectRackProps)
     onSelectionChange(project ? { project, events: events.filter((event) => event.workspace === project.name).slice(0, 8) } : null);
   }, [events, onSelectionChange, projects, selectedName]);
 
-  if (state === 'loading') return <section className="rack-state" aria-live="polite">Loading project evidence…</section>;
-  if (state === 'error') return <section className="rack-state rack-state--error" role="alert">Project evidence is unavailable: {error}</section>;
+  if (state === 'loading') return <section className="rack-state" aria-live="polite">正在加载项目证据…</section>;
+  if (state === 'error') return <section className="rack-state rack-state--error" role="alert">项目证据不可用：{error}</section>;
   if (projects.length === 0) return null;
 
   return (
     <section className="project-rack-section" aria-labelledby="project-rack-title">
       <div className="section-heading">
-        <div><p className="eyebrow">Evidence rack</p><h2 id="project-rack-title">Projects in motion</h2></div>
-        <p className="muted">Use arrow keys, the wheel, drag, or select a file card.</p>
+        <div><p className="eyebrow">证据卡架</p><h2 id="project-rack-title">动态项目</h2></div>
+        <p className="muted">使用方向键、滚轮、拖动，或直接点击卡片选择。</p>
       </div>
       <div
         ref={rackRef}
         className="project-rack"
         role="listbox"
-        aria-label="Project evidence rack"
+        aria-label="项目证据卡架"
         aria-activedescendant={selectedName ? `project-card-${selectedName}` : undefined}
         tabIndex={0}
         onKeyDown={(event) => {
@@ -189,7 +189,7 @@ export function ProjectRack({ refreshKey, onSelectionChange }: ProjectRackProps)
             onClick={() => select(project.name)}
           >
             <span className="project-card__tab">{String(index + 1).padStart(2, '0')}</span>
-            <span className="project-card__sheet"><small>{project.eventCount} evidence events</small><strong>{project.name}</strong><em>Last activity · {formatDate(project.lastActivity)}</em></span>
+            <span className="project-card__sheet"><small>{project.eventCount} 条证据事件</small><strong>{project.name}</strong><em>最近活动 · {formatDate(project.lastActivity)}</em></span>
           </button>;
         })}
       </div>

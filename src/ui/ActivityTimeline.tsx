@@ -20,7 +20,7 @@ function apiBaseUrl(): string {
 
 async function readJson(path: string, signal: AbortSignal): Promise<Record<string, unknown>> {
   const response = await fetch(new URL(path, apiBaseUrl()), { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal });
-  if (!response.ok) throw new Error(`The local service responded with ${response.status}.`);
+  if (!response.ok) throw new Error(`本地服务响应了 ${response.status}。`);
   const payload: unknown = await response.json();
   if (!isRecord(payload)) throw new Error('The local service returned an unexpected response.');
   return payload;
@@ -49,7 +49,7 @@ function buildDays(events: TimelineEvent[]): Day[] {
     const date = new Date(anchor);
     date.setDate(date.getDate() - (13 - offset));
     const key = date.toLocaleDateString('en-CA');
-    return { key, label: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), count: counts.get(key) ?? 0 };
+    return { key, label: date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }), count: counts.get(key) ?? 0 };
   });
 }
 
@@ -79,16 +79,16 @@ export function ActivityTimeline({ refreshKey }: { refreshKey: number }) {
 
   const days = useMemo(() => buildDays(events), [events]);
   const selectedEvents = selectedDay ? events.filter((event) => dateKey(event.occurredAt) === selectedDay) : [];
-  if (state === 'loading') return <section className="timeline-panel" aria-live="polite">Loading observed activity…</section>;
+  if (state === 'loading') return <section className="timeline-panel" aria-live="polite">正在加载观测活动…</section>;
   if (state === 'error' || events.length === 0) return null;
 
   return <section className="timeline-panel" aria-labelledby="timeline-title">
-    <div className="section-heading"><div><p className="eyebrow">Activity track</p><h2 id="timeline-title">Observed event rhythm</h2></div><p className="muted">Select a date to inspect source evidence.</p></div>
-    <div className="heatmap-strip" role="list" aria-label="Fourteen-day activity timeline">
-      {days.map((day) => <button key={day.key} type="button" role="listitem" className={`heatmap-day heatmap-day--${Math.min(3, day.count)} ${day.key === selectedDay ? 'heatmap-day--selected' : ''}`} onClick={() => setSelectedDay(day.key)} aria-pressed={day.key === selectedDay} aria-label={`${day.label}: ${day.count} observed events`}><span>{day.label}</span><b>{day.count}</b></button>)}
+    <div className="section-heading"><div><p className="eyebrow">活动轨迹</p><h2 id="timeline-title">观测事件节奏</h2></div><p className="muted">选择日期查看当天的来源证据。</p></div>
+    <div className="heatmap-strip" role="list" aria-label="十四天活动时间线">
+      {days.map((day) => <button key={day.key} type="button" role="listitem" className={`heatmap-day heatmap-day--${Math.min(3, day.count)} ${day.key === selectedDay ? 'heatmap-day--selected' : ''}`} onClick={() => setSelectedDay(day.key)} aria-pressed={day.key === selectedDay} aria-label={`${day.label}：${day.count} 条观测事件`}><span>{day.label}</span><b>{day.count}</b></button>)}
     </div>
     <ol className="timeline-events" aria-live="polite">
-      {selectedEvents.length ? selectedEvents.slice(0, 4).map((event) => <li key={event.id}><time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time><strong>{event.title}</strong><span>{label(event.sourceId)} · {label(event.type)}</span></li>) : <li className="muted">No observed events on this date.</li>}
+      {selectedEvents.length ? selectedEvents.slice(0, 4).map((event) => <li key={event.id}><time dateTime={event.occurredAt}>{new Date(event.occurredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time><strong>{event.title}</strong><span>{label(event.sourceId)} · {label(event.type)}</span></li>) : <li className="muted">该日期暂无观测事件。</li>}
     </ol>
   </section>;
 }

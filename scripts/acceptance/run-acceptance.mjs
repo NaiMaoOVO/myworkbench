@@ -245,7 +245,7 @@ let cdp = session.cdp;
 try {
   await waitForLoad(cdp);
   const bodyText = await evaluate(cdp, '(document.body?.innerText ?? "")');
-  record('empty/no-indexed-evidence-copy', /No indexed evidence/i.test(bodyText), bodyText.replace(/\s+/g, ' ').slice(0, 140));
+  record('empty/no-indexed-evidence-copy', /尚无已索引的证据/i.test(bodyText), bodyText.replace(/\s+/g, ' ').slice(0, 140));
   await widthLoop(cdp, 'empty');
 
   // loading surface: heavy throttling keeps requests in flight during reload
@@ -263,7 +263,7 @@ try {
   await setViewport(cdp, 1440);
   await shot(cdp, 'empty-loading');
   const loadingText = await evaluate(cdp, '(document.body?.innerText ?? "").replace(/\\s+/g, " ").slice(0, 300)');
-  record('empty/loading-surface', /Loading/i.test(loadingText), loadingText.slice(0, 120));
+  record('empty/loading-surface', /正在加载/i.test(loadingText), loadingText.slice(0, 120));
   await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 0, downloadThroughput: -1, uploadThroughput: -1 });
   await waitForLoad(cdp);
 
@@ -281,7 +281,7 @@ try {
     await sleep(1600);
     await shot(cdp, 'empty-error');
     const errorText = await evaluate(cdp, '(document.body?.innerText ?? "").replace(/\\s+/g, " ")');
-    record('empty/error-surface', /unavailable|Try again/i.test(errorText), errorText.slice(0, 160));
+    record('empty/error-surface', /不可用|重试/i.test(errorText), errorText.slice(0, 160));
     await cdp.send('Fetch.disable');
     await waitForLoad(cdp);
   }
@@ -401,7 +401,7 @@ try {
     await sleep(450);
     await shot(cdp, 'view-content-search-empty');
     const emptyCopy = await evaluate(cdp, 'document.body.innerText.replace(/\\s+/g, " ")');
-    record('content/no-results-surface', /no .*match|nothing|No content/i.test(emptyCopy), emptyCopy.match(/(?:no .{0,60}|No .{0,60})/)?.[0] ?? '');
+    record('content/no-results-surface', /没有匹配的已授权内容元数据/i.test(emptyCopy), emptyCopy.match(/当前视图.{0,40}/)?.[0] ?? '');
   } else {
     record('content/search-input-found', false, 'no input rendered');
   }

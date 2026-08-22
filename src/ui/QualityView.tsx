@@ -25,9 +25,9 @@ function apiBaseUrl(): string {
 
 async function readJson(path: string, signal: AbortSignal): Promise<Record<string, unknown>> {
   const response = await fetch(new URL(path, apiBaseUrl()), { headers: { Accept: 'application/json' }, credentials: 'same-origin', signal });
-  if (!response.ok) throw new Error(`The local service responded with ${response.status}.`);
+  if (!response.ok) throw new Error(`本地服务响应了 ${response.status}。`);
   const payload: unknown = await response.json();
-  if (!isRecord(payload)) throw new Error('The quality endpoint returned an unexpected response.');
+  if (!isRecord(payload)) throw new Error('质量端点返回了意外的响应格式。');
   return payload;
 }
 
@@ -70,18 +70,18 @@ export function QualityView({ refreshKey }: { refreshKey: number }) {
 
   return (
     <section className="view-panel quality-view" aria-labelledby="quality-view-title">
-      <div className="view-heading"><div><p className="eyebrow">Data explanation</p><h2 id="quality-view-title">Coverage and diagnostics</h2></div><p className="muted">Observed scan outcomes, not inferred completeness.</p></div>
-      {state === 'loading' ? <p className="muted">Loading scan quality…</p> : null}
-      {state === 'error' ? <p className="error-copy">Quality data is unavailable. Check the local service and try again.</p> : null}
+      <div className="view-heading"><div><p className="eyebrow">数据说明</p><h2 id="quality-view-title">覆盖与诊断</h2></div><p className="muted">展示实际扫描结果，而非推断的完整度。</p></div>
+      {state === 'loading' ? <p className="muted">正在加载扫描质量…</p> : null}
+      {state === 'error' ? <p className="error-copy">质量数据不可用。请检查本地服务后重试。</p> : null}
       {quality ? <>
         <div className="quality-metrics">
-          <div><span>Scans</span><strong>{quality.scans}</strong></div>
-          <div><span>Partial</span><strong>{quality.partial}</strong></div>
-          <div><span>Blocked</span><strong>{quality.blocked}</strong></div>
-          <div><span>Diagnostics</span><strong>{quality.diagnostics.length}</strong></div>
+          <div><span>扫描总数</span><strong>{quality.scans}</strong></div>
+          <div><span>部分成功</span><strong>{quality.partial}</strong></div>
+          <div><span>被阻止</span><strong>{quality.blocked}</strong></div>
+          <div><span>诊断条目</span><strong>{quality.diagnostics.length}</strong></div>
         </div>
-        <div className="quality-section"><h3>Recent scan runs</h3>{scans.length === 0 ? <p className="muted">No scans have been recorded.</p> : <ul className="scan-list">{scans.slice(0, 12).map((scan) => <li key={scan.id}><span className={`scan-status scan-status--${scan.status}`}>{scan.status}</span><strong>{scan.sourceId}</strong><span>{scan.parsed} parsed · {scan.failed} failed</span><time dateTime={scan.startedAt}>{new Date(scan.startedAt).toLocaleString()}</time></li>)}</ul>}</div>
-        <div className="quality-section"><h3>Diagnostics</h3>{quality.diagnostics.length === 0 ? <p className="muted">No diagnostics recorded.</p> : <ul className="diagnostic-list">{quality.diagnostics.slice(0, 12).map((diagnostic, index) => <li key={`${diagnostic.code}-${index}`}><span className={`severity severity--${diagnostic.severity}`}>{diagnostic.severity}</span><div><strong>{diagnostic.code}</strong><p>{diagnostic.safeMessage}</p></div><small>{diagnostic.sourceId}</small></li>)}</ul>}</div>
+        <div className="quality-section"><h3>最近扫描记录</h3>{scans.length === 0 ? <p className="muted">尚未记录任何扫描。</p> : <ul className="scan-list">{scans.slice(0, 12).map((scan) => <li key={scan.id}><span className={`scan-status scan-status--${scan.status}`}>{scan.status}</span><strong>{scan.sourceId}</strong><span>解析 {scan.parsed} · 失败 {scan.failed}</span><time dateTime={scan.startedAt}>{new Date(scan.startedAt).toLocaleString()}</time></li>)}</ul>}</div>
+        <div className="quality-section"><h3>诊断信息</h3>{quality.diagnostics.length === 0 ? <p className="muted">暂无诊断记录。</p> : <ul className="diagnostic-list">{quality.diagnostics.slice(0, 12).map((diagnostic, index) => <li key={`${diagnostic.code}-${index}`}><span className={`severity severity--${diagnostic.severity}`}>{diagnostic.severity}</span><div><strong>{diagnostic.code}</strong><p>{diagnostic.safeMessage}</p></div><small>{diagnostic.sourceId}</small></li>)}</ul>}</div>
       </> : null}
     </section>
   );
