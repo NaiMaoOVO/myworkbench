@@ -4,6 +4,8 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'   # 每周一 03:00 UTC 回归，捕捉环境漂移
 
 jobs:
   package:
@@ -22,6 +24,10 @@ jobs:
           node-version: 24
       - run: npm ci
       - run: npm test
+      - name: Dependency audit (report)
+        run: npm audit --audit-level=high || echo '::warning::npm audit 发现高危依赖，请检查日志'
+      - name: Generate SBOM
+        run: npx --yes @cyclonedx/cyclonedx-npm --output-file sbom.json --output-format JSON || echo '::warning::SBOM 生成失败'
       - run: npx electron-builder ${{ matrix.args }}
         env:
           CSC_IDENTITY_AUTO_DETECTION: 'false'
@@ -36,6 +42,7 @@ jobs:
             release/*.dmg
             release/*.exe
             release/SHA256SUMS.txt
+            sbom.json
           if-no-files-found: error
 
   acceptance:

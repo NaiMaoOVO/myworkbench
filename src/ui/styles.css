@@ -385,3 +385,11 @@ time, .muted { color: #849187; font-size: .8rem; }
 .wizard-outcomes { display: grid; gap: .5rem; margin: 0 0 1rem; padding: 0; list-style: none; }
 .wizard-outcomes li { display: flex; align-items: center; justify-content: space-between; padding: .6rem .8rem; border: 1px solid rgba(220,255,231,.1); border-radius: .7rem; background: rgba(0,0,0,.2); }
 @media (max-width: 767px) { .wizard-overlay { padding: .8rem; } .wizard-panel { padding: 1.4rem 1.2rem; } }
+
+.timeline-view { grid-column: 2; }
+.heatmap-strip--wide { grid-template-columns: repeat(15, minmax(0, 1fr)); }
+.timeline-day-detail { margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid rgba(220,255,231,.08); }
+.timeline-day-detail h3 { color: #eafff1; font-size: 1.02rem; }
+.timeline-events--full li { grid-template-columns: 3.4rem 1fr auto; padding: .55rem .3rem; border-bottom: 1px solid rgba(220,255,231,.06); }
+@media (max-width: 1279px) { .timeline-view { grid-column: 1 / -1; } .heatmap-strip--wide { grid-template-columns: repeat(10, minmax(0, 1fr)); } }
+@media (max-width: 767px) { .heatmap-strip--wide { grid-template-columns: repeat(7, minmax(0, 1fr)); } }

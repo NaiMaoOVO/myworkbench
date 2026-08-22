@@ -7,6 +7,7 @@ import { QualityView } from './QualityView';
 import { ProjectsView } from './ProjectsView';
 import { SettingsView } from './SettingsView';
 import { FirstRunWizard } from './FirstRunWizard';
+import { TimelineView } from './TimelineView';
 
 type ContentScope = 'metadata' | 'metadata_and_body';
 
@@ -18,7 +19,7 @@ type RequestState<T> =
 type Metric = { label: string; value: string };
 type SourceSummary = { id: string; displayName: string; state: string; supportsBodies: boolean; version: string };
 type OperationState = { busy: string | null; message: string | null; error: string | null };
-type ActiveView = 'overview' | 'content' | 'quality' | 'sources' | 'projects' | 'settings';
+type ActiveView = 'overview' | 'timeline' | 'content' | 'quality' | 'sources' | 'projects' | 'settings';
 
 type RuntimeState = {
   health: RequestState<Record<string, unknown>>;
@@ -39,6 +40,7 @@ const ignoredMetricField = /^(id|status|version|updated|created|at|date|time|eve
 
 const viewLabels: Record<ActiveView, string> = {
   overview: '总览',
+  timeline: '时间线',
   content: '内容',
   quality: '质量',
   sources: '来源中心',
@@ -168,6 +170,20 @@ export function App() {
     })();
   }, []);
 
+  // Alt+数字 快速切换视图；Esc 收起移动端详情抽屉。
+  useEffect(() => {
+    const keyHandler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') { setMobileDetailOpen(false); return; }
+      if (!event.altKey || event.ctrlKey || event.metaKey) return;
+      // 用物理键码匹配：macOS 上 Alt 会改写 event.key（Alt+2 → ™）。
+      const shortcuts: Record<string, ActiveView> = { Digit1: 'overview', Digit2: 'timeline', Digit3: 'content', Digit4: 'projects', Digit5: 'quality', Digit6: 'sources', Digit7: 'settings' };
+      const view = shortcuts[event.code];
+      if (view) { event.preventDefault(); setActiveView(view); }
+    };
+    window.addEventListener('keydown', keyHandler);
+    return () => window.removeEventListener('keydown', keyHandler);
+  }, []);
+
   // 指针流光：把指针位置写入卡片 CSS 变量，高光随之移动。
   useEffect(() => {
     const handler = (event: PointerEvent) => {
@@ -245,12 +261,13 @@ export function App() {
       <aside className="nav-pod" aria-label="主导航">
         <div className="brand-mark" aria-hidden="true">MW</div>
         <nav>
-          <button className={`nav-item ${activeView === 'overview' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('overview')} aria-current={activeView === 'overview' ? 'page' : undefined}><span aria-hidden="true">◉</span>总览</button>
-          <button className={`nav-item ${activeView === 'content' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('content')} aria-current={activeView === 'content' ? 'page' : undefined}><span aria-hidden="true">◌</span>内容</button>
-          <button className={`nav-item ${activeView === 'quality' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('quality')} aria-current={activeView === 'quality' ? 'page' : undefined}><span aria-hidden="true">◇</span>质量</button>
-          <button className={`nav-item ${activeView === 'sources' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('sources')} aria-current={activeView === 'sources' ? 'page' : undefined}><span aria-hidden="true">◫</span>来源</button>
-          <button className={`nav-item ${activeView === 'projects' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('projects')} aria-current={activeView === 'projects' ? 'page' : undefined}><span aria-hidden="true">▤</span>项目</button>
-          <button className={`nav-item ${activeView === 'settings' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('settings')} aria-current={activeView === 'settings' ? 'page' : undefined}><span aria-hidden="true">✳</span>设置</button>
+          <button className={`nav-item ${activeView === 'overview' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('overview')} aria-current={activeView === 'overview' ? 'page' : undefined} title="快捷键 Alt+1"><span aria-hidden="true">◉</span>总览</button>
+          <button className={`nav-item ${activeView === 'timeline' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('timeline')} aria-current={activeView === 'timeline' ? 'page' : undefined} title="快捷键 Alt+2"><span aria-hidden="true">⌛</span>时间线</button>
+          <button className={`nav-item ${activeView === 'content' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('content')} aria-current={activeView === 'content' ? 'page' : undefined} title="快捷键 Alt+3"><span aria-hidden="true">◌</span>内容</button>
+          <button className={`nav-item ${activeView === 'quality' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('quality')} aria-current={activeView === 'quality' ? 'page' : undefined} title="快捷键 Alt+5"><span aria-hidden="true">◇</span>质量</button>
+          <button className={`nav-item ${activeView === 'sources' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('sources')} aria-current={activeView === 'sources' ? 'page' : undefined} title="快捷键 Alt+6"><span aria-hidden="true">◫</span>来源</button>
+          <button className={`nav-item ${activeView === 'projects' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('projects')} aria-current={activeView === 'projects' ? 'page' : undefined} title="快捷键 Alt+4"><span aria-hidden="true">▤</span>项目</button>
+          <button className={`nav-item ${activeView === 'settings' ? 'nav-item--active' : ''}`} type="button" onClick={() => setActiveView('settings')} aria-current={activeView === 'settings' ? 'page' : undefined} title="快捷键 Alt+7"><span aria-hidden="true">✳</span>设置</button>
         </nav>
         <p className="nav-footnote">本地优先<br />来源只读</p>
       </aside>
@@ -264,6 +281,7 @@ export function App() {
           <ProjectRack refreshKey={projectRefreshKey} onSelectionChange={setProjectSelection} />
           <ActivityTimeline refreshKey={projectRefreshKey} />
         </> : null}
+        {activeView === 'timeline' ? <TimelineView refreshKey={projectRefreshKey} /> : null}
         {activeView === 'content' ? <ContentView refreshKey={projectRefreshKey} /> : null}
         {activeView === 'quality' ? <QualityView refreshKey={projectRefreshKey} /> : null}
         {activeView === 'projects' ? <ProjectsView refreshKey={projectRefreshKey} /> : null}

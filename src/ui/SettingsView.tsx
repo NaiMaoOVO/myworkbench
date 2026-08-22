@@ -43,6 +43,27 @@ export function SettingsView({ refreshKey }: { refreshKey: number }) {
     setMessage(result.ok ? '已保存。' : result.error ?? '保存失败。');
   };
 
+  const exportReport = async () => {
+    try {
+      const endpoints = ['/api/dashboard', '/api/projects', '/api/quality', '/api/settings'] as const;
+      const report: Record<string, unknown> = { exportedAt: new Date().toISOString(), language: 'zh-CN' };
+      for (const endpoint of endpoints) {
+        const key = endpoint.replace('/api/', '');
+        report[key] = await fetch(endpoint).then((response) => response.json());
+      }
+      const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'myworkbench-report-' + new Date().toISOString().slice(0, 10) + '.json';
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage('报告已导出（不含正文与路径）。');
+    } catch {
+      setMessage('报告导出失败。');
+    }
+  };
+
   const exportConfig = () => {
     const blob = new Blob([JSON.stringify({ scanFrequency, language: 'zh-CN', telemetry: 'disabled', exportedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -71,6 +92,10 @@ export function SettingsView({ refreshKey }: { refreshKey: number }) {
           <span>遥测</span><span className="muted">始终关闭</span>
         </div>
         {dataDir ? <div className="settings-row"><span>数据目录</span><span className="muted settings-dir">{dataDir}</span></div> : null}
+        <div className="settings-row">
+          <span>工作报告导出</span>
+          <button className="text-button" type="button" onClick={exportReport}>导出 JSON</button>
+        </div>
         <div className="settings-row">
           <span>导出配置</span>
           <button className="text-button" type="button" onClick={exportConfig}>导出 JSON</button>
