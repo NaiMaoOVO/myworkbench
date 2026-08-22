@@ -7,6 +7,8 @@ import { canonicalizeGrantRoot } from '../platform/path-policy.js';
 
 const selectionLifetimeMs = 2 * 60 * 1000;
 
+const allowedSettings = new Set(['scanFrequency', 'launchAtLogin', 'language']);
+
 export interface DirectorySelection {
   handle: string;
   sourceId: string;
@@ -18,10 +20,22 @@ export type PublicSource = Pick<StoredSource, 'id' | 'displayName' | 'version' |
 
 export class WorkbenchSourceService {
   readonly #runtime;
+  readonly #databasePath: string;
   readonly #selections = new Map<string, DirectorySelection>();
 
   constructor(databasePath: string) {
+    this.#databasePath = databasePath;
     this.#runtime = createWorkbenchRuntime(databasePath);
+  }
+
+  /** Directory containing the derived database; safe to show to the local user. */
+  dataDirectory(): string {
+    return join(this.#databasePath, '..');
+  }
+
+  grantedRoot(sourceId: string): string | null {
+    this.assertKnown(sourceId);
+    return this.#runtime.database.getGrant(sourceId)?.root ?? null;
   }
 
   close(): void {
@@ -61,6 +75,11 @@ export class WorkbenchSourceService {
   async grant(sourceId: string, selectionHandle: string, scope: ContentScope) {
     this.assertAvailable(sourceId);
     const selection = this.consumeSelection(sourceId, selectionHandle);
+    const previous = this.#runtime.database.getGrant(sourceId);
+    if (previous && previous.scope !== scope) {
+      // 正文权限变化后必须重建该源记录，增量状态随之失效。
+      this.#runtime.database.clearFileStates(sourceId);
+    }
     return this.#runtime.database.saveGrant(sourceId, selection.root, scope);
   }
 
@@ -75,9 +94,24 @@ export class WorkbenchSourceService {
     return this.#runtime.scanner.scan(sourceId);
   }
 
+  cancelScan(sourceId: string): void {
+    this.assertKnown(sourceId);
+    this.#runtime.scanner.requestCancel(sourceId);
+  }
+
   revoke(sourceId: string): void {
     this.assertAvailable(sourceId);
     this.#runtime.database.revokeGrant(sourceId);
+  }
+
+  getSettings(): Record<string, string> {
+    return this.#runtime.database.getSettings();
+  }
+
+  setSetting(key: string, value: string): void {
+    if (!allowedSettings.has(key)) throw new Error('Unsupported setting key.');
+    if (value.length > 64 || /[\u0000-\u001f]/.test(value)) throw new Error('Invalid setting value.');
+    this.#runtime.database.setSetting(key, value);
   }
 
   deleteIndex(sourceId: string): void {

@@ -62,6 +62,18 @@ const migration = `
     safe_message TEXT NOT NULL,
     created_at TEXT NOT NULL
   );
+  CREATE TABLE IF NOT EXISTS app_setting (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS scan_file_state (
+    source_id TEXT NOT NULL,
+    file_key TEXT NOT NULL,
+    locator_hash TEXT NOT NULL,
+    mtime_ms INTEGER NOT NULL,
+    size INTEGER NOT NULL,
+    PRIMARY KEY (source_id, file_key)
+  );
 `;
 
 export class WorkbenchDatabase {
@@ -164,6 +176,7 @@ export class WorkbenchDatabase {
       this.#db.prepare('DELETE FROM event WHERE source_id = ?').run(sourceId);
       this.#db.prepare('DELETE FROM diagnostic WHERE source_id = ?').run(sourceId);
       this.#db.prepare('DELETE FROM scan_run WHERE source_id = ?').run(sourceId);
+      this.#db.prepare('DELETE FROM scan_file_state WHERE source_id = ?').run(sourceId);
       this.#db.exec('COMMIT');
     } catch (error) {
       this.#db.exec('ROLLBACK');
@@ -191,10 +204,92 @@ export class WorkbenchDatabase {
     `).all() as unknown as ScanSummary[];
   }
 
+  getFileState(sourceId: string, fileKey: string): { mtimeMs: number; size: number } | null {
+    const row = this.#db.prepare('SELECT mtime_ms AS mtimeMs, size FROM scan_file_state WHERE source_id = ? AND file_key = ?').get(sourceId, fileKey) as { mtimeMs: number; size: number } | undefined;
+    return row ?? null;
+  }
+
+  recordFileState(sourceId: string, fileKey: string, locatorHash: string, mtimeMs: number, size: number): void {
+    this.#db.prepare(`
+      INSERT INTO scan_file_state(source_id, file_key, locator_hash, mtime_ms, size)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(source_id, file_key) DO UPDATE SET locator_hash = excluded.locator_hash, mtime_ms = excluded.mtime_ms, size = excluded.size
+    `).run(sourceId, fileKey, locatorHash, mtimeMs, size);
+  }
+
+  deleteEventsForLocatorHash(sourceId: string, locatorHash: string): void {
+    this.#db.prepare('DELETE FROM event WHERE source_id = ? AND locator_hash = ?').run(sourceId, locatorHash);
+  }
+
+  clearFileStates(sourceId: string): void {
+    this.#db.prepare('DELETE FROM scan_file_state WHERE source_id = ?').run(sourceId);
+  }
+
+  forgetFileStatesExcept(sourceId: string, keepKeys: string[]): void {
+    const rows = this.#db.prepare('SELECT file_key AS fileKey, locator_hash AS locatorHash FROM scan_file_state WHERE source_id = ?').all(sourceId) as Array<{ fileKey: string; locatorHash: string }>;
+    const keep = new Set(keepKeys);
+    for (const row of rows) {
+      if (keep.has(row.fileKey)) continue;
+      this.deleteEventsForLocatorHash(sourceId, row.locatorHash);
+      this.#db.prepare('DELETE FROM scan_file_state WHERE source_id = ? AND file_key = ?').run(sourceId, row.fileKey);
+    }
+  }
+
+  getEventBody(id: string): string | null {
+    const row = this.#db.prepare('SELECT body FROM event WHERE id = ?').get(id) as { body: string | null } | undefined;
+    return row?.body ?? null;
+  }
+
+  getSettings(): Record<string, string> {
+    const rows = this.#db.prepare('SELECT key, value FROM app_setting').all() as Array<{ key: string; value: string }>;
+    return Object.fromEntries(rows.map((row) => [row.key, row.value]));
+  }
+
+  setSetting(key: string, value: string): void {
+    this.#db.prepare('INSERT INTO app_setting(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, value);
+  }
+
   dashboard(): Record<string, unknown> {
     const count = this.#db.prepare('SELECT COUNT(*) AS count FROM event').get() as { count: number };
     const projects = this.#db.prepare('SELECT COUNT(DISTINCT workspace) AS count FROM event WHERE workspace IS NOT NULL').get() as { count: number };
-    return { eventCount: count.count, projectCount: projects.count, dataState: count.count === 0 ? 'empty' : 'ready' };
+    const now = Date.now();
+    const withinDays = (days: number): number => now - days * 86400000;
+    const rows = this.#db.prepare('SELECT source_id AS sourceId, occurred_at AS occurredAt, workspace FROM event').all() as Array<{ sourceId: string; occurredAt: string; workspace: string | null }>;
+    let events30 = 0;
+    let events90 = 0;
+    let commits30 = 0;
+    let contentActivity30 = 0;
+    let sessions30 = 0;
+    const activeProjects = new Set<string>();
+    for (const row of rows) {
+      const time = Date.parse(row.occurredAt);
+      if (Number.isNaN(time)) continue;
+      if (time >= withinDays(90)) events90 += 1;
+      if (time < withinDays(30)) continue;
+      events30 += 1;
+      if (row.sourceId === 'git') commits30 += 1;
+      if (row.sourceId === 'obsidian' || row.sourceId === 'exports-compat') contentActivity30 += 1;
+      if (!['git', 'obsidian', 'exports-compat'].includes(row.sourceId)) sessions30 += 1;
+      if (time >= withinDays(14) && row.workspace) activeProjects.add(row.workspace);
+    }
+    // 工作分钟为估算口径：每条 AI 会话事件计 5 分钟；UI 必须随数字展示口径说明。
+    const workMinutes30 = sessions30 * 5;
+    return {
+      eventCount: count.count,
+      projectCount: projects.count,
+      dataState: count.count === 0 ? 'empty' : 'ready',
+      events30,
+      events90,
+      commits30,
+      contentActivity30,
+      activeProjects14d: activeProjects.size,
+      workMinutes30,
+      groups30: {
+        delivery: commits30,
+        creation: contentActivity30,
+        sessions: sessions30,
+      },
+    };
   }
 
   quality(): Record<string, unknown> {

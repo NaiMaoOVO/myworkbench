@@ -7,6 +7,7 @@ import type { AddressInfo } from 'node:net';
 import type { ContentScope } from '../core/types.js';
 import { createWorkbenchRuntime } from '../core/runtime.js';
 import { canonicalizeGrantRoot } from '../platform/path-policy.js';
+import { discoverCandidates } from '../platform/discover.js';
 
 interface ApiSecurity {
   appOrigin: string;
@@ -43,6 +44,8 @@ export interface LocalApiResponse {
 }
 
 const jsonLimit = 32 * 1024;
+
+const allowedSettingKeys = new Set(['scanFrequency', 'launchAtLogin', 'language']);
 
 export class LocalApiServer {
   readonly security: ApiSecurity;
@@ -177,6 +180,33 @@ export class LocalApiServer {
     }
   }
 
+  /** 正文仅对已单独授权正文权限的来源返回；搜索覆盖标题、来源与已授权正文。 */
+  private contentItems(url: URL): Array<Record<string, unknown>> {
+    const query = (url.searchParams.get('q') ?? '').trim().toLocaleLowerCase();
+    const bodyGranted = new Set(
+      this.runtime.database
+        .listSources()
+        .map((source) => source.id)
+        .filter((sourceId) => this.runtime.database.getGrant(sourceId)?.scope === 'metadata_and_body'),
+    );
+    const items: Array<Record<string, unknown>> = [];
+    for (const row of this.runtime.database.listEvents(2000)) {
+      const sourceId = String(row.sourceId);
+      const includeBody = bodyGranted.has(sourceId);
+      const body = includeBody ? this.runtime.database.getEventBody(String(row.id)) : null;
+      const haystack = `${String(row.title)} ${sourceId} ${String(row.occurredAt)} ${body ?? ""}`.toLocaleLowerCase();
+      if (query && !haystack.includes(query)) continue;
+      items.push({
+        id: row.id,
+        sourceId,
+        occurredAt: row.occurredAt,
+        title: row.title,
+        ...(includeBody && body ? { body: body.slice(0, 4000), permission: 'body_authorized' } : { permission: 'metadata_only' }),
+      });
+    }
+    return items;
+  }
+
   private handleRead(url: URL, headers: Record<string, string>): LocalApiResponse {
     const path = url.pathname;
     if (path === '/health') return this.response(200, headers, { status: 'ready', storage: 'ready' });
@@ -184,7 +214,7 @@ export class LocalApiServer {
     if (path === '/api/heatmap') return this.response(200, headers, { events: this.runtime.database.listEvents(1000).map((event) => ({ occurredAt: event.occurredAt, sourceId: event.sourceId })) });
     if (path === '/api/events') return this.response(200, headers, { events: this.runtime.database.listEvents() });
     if (path === '/api/projects') return this.response(200, headers, { projects: projectsFromEvents(this.runtime.database.listEvents(1000)) });
-    if (path === '/api/content') return this.response(200, headers, { content: this.runtime.database.listEvents().map(({ id, sourceId, occurredAt, title }) => ({ id, sourceId, occurredAt, title })) });
+    if (path === '/api/content') return this.response(200, headers, { content: this.contentItems(url) });
     if (path === '/api/quality') return this.response(200, headers, this.runtime.database.quality());
     if (path === '/api/sources') {
       const states = new Map(this.runtime.database.listSources().map((source) => [source.id, source]));
@@ -192,15 +222,21 @@ export class LocalApiServer {
     }
     if (path === '/api/scans') return this.response(200, headers, { scans: this.runtime.database.listScanRuns() });
     if (path === '/api/diagnostics') return this.response(200, headers, { diagnostics: this.runtime.database.listDiagnostics() });
-    if (path === '/api/settings') return this.response(200, headers, { telemetry: 'disabled', scanFrequency: 'manual' });
+    if (path === '/api/settings') return this.response(200, headers, { telemetry: 'disabled', ...this.runtime.database.getSettings() });
     return this.response(404, headers, { error: 'not_found' });
   }
 
   private async handleControl(method: string, url: URL, body: JsonObject, headers: Record<string, string>): Promise<LocalApiResponse> {
     const match = url.pathname.match(/^\/api\/sources\/([^/]+)\/(grants|preview|scan|pause|index)$/);
     if (!match) {
-      if (method === 'POST' && url.pathname === '/api/sources/discover') return this.response(200, headers, { sources: [] });
-      if (method === 'PATCH' && url.pathname === '/api/settings') return this.response(200, headers, { updated: true });
+      if (method === 'POST' && url.pathname === '/api/sources/discover') return this.response(200, headers, { sources: discoverCandidates() });
+      if (method === 'PATCH' && url.pathname === '/api/settings') {
+        for (const [key, value] of Object.entries(body)) {
+          if (!allowedSettingKeys.has(key) || typeof value !== 'string' || value.length > 64) return this.response(400, headers, { error: 'invalid_setting' });
+          this.runtime.database.setSetting(key, value);
+        }
+        return this.response(200, headers, { updated: true, settings: this.runtime.database.getSettings() });
+      }
       return this.response(404, headers, { error: 'not_found' });
     }
 

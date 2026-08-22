@@ -1,6 +1,7 @@
 import { BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
 import type { ContentScope } from '../../src/core/types.js';
 import { WorkbenchSourceService } from '../../src/core/source-service.js';
+import { discoverCandidates } from '../../src/platform/discover.js';
 
 const sourceIdPattern = /^[a-z0-9-]{1,64}$/;
 
@@ -87,6 +88,7 @@ export function registerSourceIpc(service: WorkbenchSourceService, uiOrigin: str
   for (const [channel, action] of [
     ['sources:preview', (sourceId: string) => service.preview(sourceId)],
     ['sources:scan', (sourceId: string) => service.scan(sourceId)],
+    ['sources:cancel-scan', (sourceId: string) => { service.cancelScan(sourceId); return Promise.resolve({ cancelled: true }); }],
     ['sources:revoke', (sourceId: string) => service.revoke(sourceId)],
     ['sources:delete-index', (sourceId: string) => service.deleteIndex(sourceId)],
   ] as const) {
@@ -100,4 +102,61 @@ export function registerSourceIpc(service: WorkbenchSourceService, uiOrigin: str
       }
     });
   }
+
+  ipcMain.handle('sources:discover-candidates', async (event) => {
+    try {
+      assertTrustedSender(event, uiOrigin);
+      return { ok: true, value: discoverCandidates() } as const;
+    } catch (error) {
+      return safeError(error);
+    }
+  });
+
+  ipcMain.handle('sources:grant-directory', async (event, rawSourceId: unknown, rawRoot: unknown, rawScope: unknown) => {
+    try {
+      assertTrustedSender(event, uiOrigin);
+      const sourceId = assertSourceId(rawSourceId);
+      const scope = assertScope(rawScope);
+      if (typeof rawRoot !== 'string' || rawRoot.length === 0 || rawRoot.length > 1024) throw new Error('Invalid folder selection.');
+      const handle = await service.createSelection(sourceId, rawRoot);
+      const grant = await service.grant(sourceId, handle, scope);
+      return { ok: true, grant: { sourceId: grant.sourceId, scope: grant.scope, grantedAt: grant.grantedAt } } as const;
+    } catch (error) {
+      return safeError(error);
+    }
+  });
+
+  ipcMain.handle('settings:get', async (event) => {
+    try {
+      assertTrustedSender(event, uiOrigin);
+      return { ok: true, value: { ...service.getSettings(), dataDir: service.dataDirectory() } } as const;
+    } catch (error) {
+      return safeError(error);
+    }
+  });
+
+  ipcMain.handle('settings:set', async (event, rawKey: unknown, rawValue: unknown) => {
+    try {
+      assertTrustedSender(event, uiOrigin);
+      if (typeof rawKey !== 'string' || typeof rawValue !== 'string') throw new Error('Invalid setting payload.');
+      service.setSetting(rawKey, rawValue);
+      return { ok: true } as const;
+    } catch (error) {
+      return safeError(error);
+    }
+  });
+
+  ipcMain.handle('sources:reveal-directory', async (event, rawSourceId: unknown) => {
+    try {
+      assertTrustedSender(event, uiOrigin);
+      const sourceId = assertSourceId(rawSourceId);
+      const grantRoot = service.grantedRoot(sourceId);
+      if (!grantRoot) throw new Error('An active source authorization is required.');
+      const { shell } = await import('electron');
+      shell.showItemInFolder(grantRoot);
+      return { ok: true } as const;
+    } catch (error) {
+      return safeError(error);
+    }
+  });
 }

@@ -43,12 +43,27 @@ The machine running this repository has real local data for one of the six newly
 - Local verification on this machine: the packaged app launched in self-hosted mode (UI and API on one loopback origin), read the seeded database (11 events / 3 projects), kept the full source inventory (11 sources, six new adapters `awaiting_authorization`), survived a full stop/relaunch with identical data (restart recovery), and uninstalled cleanly with no workspace leftovers. The sandboxed Chromium flags used by the harness are environment accommodations, not product requirements.
 - `hdiutil` is denied inside this sandbox, so the DMG itself is produced by `.github/workflows/build.yml` (macOS DMG + Windows NSIS on tag push, tests gate the build). Local equivalent: `npm run dist:mac -c.directories.output=/tmp/myworkbench-release`.
 
+## Gap-closure round (August 22, 2026)
+
+A line-by-line comparison against the source PRD surfaced and closed the following gaps:
+
+- **Settings**: persisted `app_setting` table with real GET/PATCH on `/api/settings`, a new 设置 view (scan frequency, language, telemetry-off statement, data directory, config export), and desktop-bridge settings channels.
+- **Discovery**: version-tolerant candidate directories per agent tool (`src/platform/discover.ts`), exposed through `/api/sources/discover` and a 来源中心 discovery entry; existing candidates can be authorized in one click from the desktop shell.
+- **Insights**: the dashboard now computes 30/90-day event counts, commits, content activity, active projects (14-day window), and an estimated-work-minutes figure with its 口径说明 printed inline; work groups split delivery / creation / AI sessions by source.
+- **Projects view**: lifecycle filters (活跃 ≤14 天 / 待复核 15–60 天 / 归档 >60 天) labelled as rule inference, plus per-source distribution.
+- **Body search**: `/api/content` returns bodies only for sources whose grant scope includes them, supports `?q=` across title/source/time/body, and labels each row 含已授权正文 / 仅元数据.
+- **Pause semantics**: scans can be cancelled mid-run (`sources:cancel-scan`, status `cancelled`); resuming is an idempotent re-scan.
+- **Incremental scanning**: a shared JSONL scanner skips unchanged files via a `scan_file_state` table, deletes-and-replaces changed ones, prunes removed ones; scope changes and index deletion invalidate state. Verified against real ZCode data — full scan 300–380 ms for 45 records, incremental rescan ~9 ms.
+- **Visual/UX**: pointer-tracked glass highlight on metric and group cards, staggered card entrance plus new-project depth entry, mobile bottom navigation with a detail drawer, dynamic window title.
+- **Compliance**: MIT LICENSE, CHANGELOG, CI artifact checksums.
+
 ## Remaining work
 
-1. Add new-project depth-entry behavior based on a real scan delta.
-2. Human/image-model visual review of materials and lighting against the reference image; refine optical layers if the green accent coverage is judged excessive.
-3. Verify the remaining agent adapters (Gemini, iFlow, Hermes, Kimi Code, OpenClaw) against real installed-tool data as it becomes available; ZCode is verified.
-4. Configure the GitHub remote, push, and let CI produce the release artifacts; signing keys and notarization remain future work for public distribution.
+1. Human/image-model visual review of materials and lighting against the reference image.
+2. Verify Gemini/iFlow/Hermes/Kimi Code/OpenClaw adapters against real installed-tool data as it becomes available.
+3. Windows clean-machine install verification (CI builds NSIS; a real Windows host is needed for the lifecycle test).
+4. Signing/notarization for public distribution (requires developer certificates).
+5. Performance validation at PRD scale (100k records, p95 ≤200 ms).
 
 ## Agent adapter coverage (M3, August 22, 2026)
 

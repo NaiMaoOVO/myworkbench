@@ -1,7 +1,9 @@
 import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { basename, join } from 'node:path';
 import { createInterface } from 'node:readline';
+import { basename, join } from 'node:path';
+import type { AdapterScanContext } from '../core/types.js';
+import { scanJsonlDirectory } from './jsonl-incremental.js';
 import type { AdapterHealth, AuthorizationGrant, CandidateLocation, Diagnostic, NormalizedRecord, PlatformContext, RawRecord, ScanPreview, ScanRecord, SourceAdapter, SourceManifest } from '../core/types.js';
 import { assertPathWithinGrant } from '../platform/path-policy.js';
 
@@ -83,21 +85,18 @@ export class ClaudeAdapter implements SourceAdapter {
     };
   }
 
-  async *scan(grant: AuthorizationGrant, _cursor?: string): AsyncIterable<ScanRecord> {
-    const file = await assertPathWithinGrant(grant.root, join(grant.root, dataFileName));
+  async *scan(grant: AuthorizationGrant, _cursor?: string, context?: AdapterScanContext): AsyncIterable<ScanRecord> {
+    await assertPathWithinGrant(grant.root, join(grant.root, dataFileName));
     const includeBody = grant.scope === 'metadata_and_body';
-    const reader = createInterface({ input: createReadStream(file, { encoding: 'utf8' }), crlfDelay: Infinity });
-    let lineNumber = 0;
-
-    for await (const line of reader) {
-      lineNumber += 1;
-      if (!line.trim()) continue;
-      try {
-        yield { kind: 'record', value: asRawRecord(JSON.parse(line), basename(file), includeBody) };
-      } catch {
-        yield { kind: 'diagnostic', value: malformedDiagnostic(lineNumber) };
-      }
-    }
+    yield* scanJsonlDirectory({
+      root: grant.root,
+      sourceId,
+      includeBody,
+      select: (name) => name === dataFileName,
+      mapRow: asRawRecord,
+      diagnosticCode: 'CLAUDE_RECORD_INVALID',
+      context,
+    });
   }
 
   normalize(raw: RawRecord): NormalizedRecord {

@@ -80,11 +80,23 @@ export interface PlatformContext {
   platform: NodeJS.Platform;
 }
 
+export interface AdapterFileState {
+  mtimeMs: number;
+  size: number;
+}
+
+export interface AdapterScanContext {
+  previousFileState(key: string): AdapterFileState | null;
+  recordFileState(key: string, locatorHash: string, state: AdapterFileState): void;
+  deleteRecordsForLocator(sourceId: string, locatorHash: string): void;
+  forgetFileStatesExcept(sourceId: string, keepKeys: string[]): void;
+}
+
 export interface SourceAdapter {
   manifest(): SourceManifest;
   discover(platform: PlatformContext): Promise<CandidateLocation[]>;
   preview(grant: AuthorizationGrant): Promise<ScanPreview>;
-  scan(grant: AuthorizationGrant, cursor?: string): AsyncIterable<ScanRecord>;
+  scan(grant: AuthorizationGrant, cursor?: string, context?: AdapterScanContext): AsyncIterable<ScanRecord>;
   normalize(raw: RawRecord): NormalizedRecord;
   redact(record: NormalizedRecord, scope: ContentScope): NormalizedRecord;
   health(): Promise<AdapterHealth>;

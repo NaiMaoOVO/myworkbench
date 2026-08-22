@@ -1,8 +1,33 @@
-import type { AuthorizationGrant, ScanStatus, ScanSummary, SourceAdapter } from './types.js';
+import { createHash } from 'node:crypto';
+import type { AdapterScanContext, AuthorizationGrant, ScanStatus, ScanSummary, SourceAdapter } from './types.js';
 import { WorkbenchDatabase } from '../storage/database.js';
 
 export class ScanCoordinator {
+  readonly #cancelled = new Set<string>();
+
   constructor(private readonly database: WorkbenchDatabase, private readonly adapters: Map<string, SourceAdapter>) {}
+
+  requestCancel(sourceId: string): void {
+    this.#cancelled.add(sourceId);
+  }
+
+  isCancelled(sourceId: string): boolean {
+    return this.#cancelled.has(sourceId);
+  }
+
+  #contextFor(sourceId: string): AdapterScanContext {
+    const database = this.database;
+    return {
+      previousFileState: (key) => database.getFileState(sourceId, key),
+      recordFileState: (key, locatorHash, state) => database.recordFileState(sourceId, key, locatorHash, state.mtimeMs, state.size),
+      deleteRecordsForLocator: (locatorHash) => database.deleteEventsForLocatorHash(sourceId, locatorHash),
+      forgetFileStatesExcept: (_sourceId: string, keepKeys: string[]) => database.forgetFileStatesExcept(sourceId, keepKeys),
+    };
+  }
+
+  locatorHash(key: string): string {
+    return createHash('sha256').update(key).digest('hex');
+  }
 
   async preview(sourceId: string, grant: AuthorizationGrant) {
     const adapter = this.getAdapter(sourceId);
@@ -37,7 +62,15 @@ export class ScanCoordinator {
     }
 
     try {
-      for await (const item of adapter.scan(grant)) {
+      this.#cancelled.delete(sourceId);
+      const context = this.#contextFor(sourceId);
+      for await (const item of adapter.scan(grant, undefined, context)) {
+        if (this.#cancelled.has(sourceId)) {
+          summary.status = 'cancelled';
+          summary.endedAt = new Date().toISOString();
+          this.database.finishScan(summary);
+          return summary;
+        }
         if (item.kind === 'diagnostic') {
           summary.failed += 1;
           this.database.addDiagnostic(item.value);
@@ -59,7 +92,7 @@ export class ScanCoordinator {
         }
       }
       this.database.touchGrant(sourceId);
-      summary.status = scanStatusFor(summary);
+      if (summary.status !== 'cancelled') summary.status = scanStatusFor(summary);
     } catch {
       summary.failed += 1;
       summary.status = summary.parsed > 0 ? 'partial' : 'blocked';

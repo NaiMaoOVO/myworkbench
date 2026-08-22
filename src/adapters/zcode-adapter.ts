@@ -1,8 +1,9 @@
 import { createReadStream } from 'node:fs';
 import { readdir, stat } from 'node:fs/promises';
-import { basename, join } from 'node:path';
+import { join } from 'node:path';
 import { createInterface } from 'node:readline';
-import type { AdapterHealth, AuthorizationGrant, CandidateLocation, Diagnostic, NormalizedRecord, PlatformContext, RawRecord, ScanPreview, ScanRecord, SourceAdapter, SourceManifest } from '../core/types.js';
+import type { AdapterHealth, AdapterScanContext, AuthorizationGrant, CandidateLocation, Diagnostic, NormalizedRecord, PlatformContext, RawRecord, ScanPreview, ScanRecord, SourceAdapter, SourceManifest } from '../core/types.js';
+import { scanJsonlDirectory } from './jsonl-incremental.js';
 import { assertPathWithinGrant } from '../platform/path-policy.js';
 
 const sourceId = 'zcode';
@@ -42,16 +43,6 @@ function asRawRecord(value: unknown, locator: string, includeBody: boolean): Raw
     workspace: undefined,
     body: includeBody && bodyText ? bodyText : undefined,
     locator,
-  };
-}
-
-function malformedDiagnostic(line: number, locator: string): Diagnostic {
-  return {
-    sourceId,
-    code: 'ZCODE_RECORD_INVALID',
-    severity: 'warning',
-    safeMessage: `A ZCode record in ${locator} at line ${line} could not be parsed.`,
-    createdAt: new Date().toISOString(),
   };
 }
 
@@ -107,23 +98,18 @@ export class ZCodeAdapter implements SourceAdapter {
     };
   }
 
-  async *scan(grant: AuthorizationGrant, _cursor?: string): AsyncIterable<ScanRecord> {
+  async *scan(grant: AuthorizationGrant, _cursor?: string, context?: AdapterScanContext): AsyncIterable<ScanRecord> {
     const root = await assertPathWithinGrant(grant.root, grant.root);
     const includeBody = grant.scope === 'metadata_and_body';
-    for (const name of await rolloutFiles(root)) {
-      const file = join(root, name);
-      const reader = createInterface({ input: createReadStream(file, { encoding: 'utf8' }), crlfDelay: Infinity });
-      let lineNumber = 0;
-      for await (const line of reader) {
-        lineNumber += 1;
-        if (!line.trim()) continue;
-        try {
-          yield { kind: 'record', value: asRawRecord(JSON.parse(line), name, includeBody) };
-        } catch {
-          yield { kind: 'diagnostic', value: malformedDiagnostic(lineNumber, name) };
-        }
-      }
-    }
+    yield* scanJsonlDirectory({
+      root,
+      sourceId,
+      includeBody,
+      select: (fileName) => fileName.endsWith('.jsonl'),
+      mapRow: asRawRecord,
+      diagnosticCode: 'ZCODE_RECORD_INVALID',
+      context,
+    });
   }
 
   normalize(raw: RawRecord): NormalizedRecord {
