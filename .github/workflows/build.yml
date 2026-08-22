@@ -37,3 +37,55 @@ jobs:
             release/*.exe
             release/SHA256SUMS.txt
           if-no-files-found: error
+
+  acceptance:
+    # 真实运行时回归：32 项检查在 macOS runner 的 Electron 中执行。
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+      - run: npm run build
+      - name: Seed runtime fixtures
+        run: npx tsx scripts/acceptance/seed.mts .mw-local/acceptance-run/data-user-data
+      - name: Run acceptance suite
+        run: node scripts/acceptance/run-acceptance.mjs
+      - name: Upload screenshots and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-report
+          path: .mw-local/acceptance/
+          if-no-files-found: warn
+
+  release:
+    needs: [package]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Extract release notes from CHANGELOG
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          awk -v ver="${VERSION#v}" '
+            $0 ~ "^## \\[" ver "\\]" { flag = 1; next }
+            /^## \\[/ && flag { exit }
+            flag { print }
+          ' CHANGELOG.md > release-notes.md
+          head -40 release-notes.md
+      - name: Attach installers to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: release-notes.md
+          generate_release_notes: false
+          files: |
+            artifacts/**/*.dmg
+            artifacts/**/*.exe
+            artifacts/**/SHA256SUMS.txt
