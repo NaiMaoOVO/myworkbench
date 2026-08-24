@@ -20,22 +20,22 @@ async function fixtureGrant(sourceId: AgentFixture, scope: AuthorizationGrant['s
   return { sourceId, root, scope, grantedAt: new Date().toISOString(), revokedAt: null, lastUsedAt: null };
 }
 
-function agentAdapterCases(): Array<{ sourceId: AgentFixture; adapter: SourceAdapter }> {
+function agentAdapterCases(): Array<{ sourceId: AgentFixture; adapter: SourceAdapter; version: string }> {
   return [
-    { sourceId: 'codex', adapter: new CodexAdapter() },
-    { sourceId: 'claude', adapter: new ClaudeAdapter() },
-    { sourceId: 'iflow', adapter: new IFlowAdapter() },
-    { sourceId: 'zcode', adapter: new ZCodeAdapter() },
-    { sourceId: 'kimi-code', adapter: new KimiCodeAdapter() },
-    { sourceId: 'gemini', adapter: new GeminiAdapter() },
-    { sourceId: 'hermes', adapter: new HermesAdapter() },
-    { sourceId: 'openclaw', adapter: new OpenClawAdapter() },
+    { sourceId: 'codex', adapter: new CodexAdapter(), version: '2.0.0' },
+    { sourceId: 'claude', adapter: new ClaudeAdapter(), version: '2.0.0' },
+    { sourceId: 'iflow', adapter: new IFlowAdapter(), version: '1.0.0' },
+    { sourceId: 'zcode', adapter: new ZCodeAdapter(), version: '1.0.0' },
+    { sourceId: 'kimi-code', adapter: new KimiCodeAdapter(), version: '1.0.0' },
+    { sourceId: 'gemini', adapter: new GeminiAdapter(), version: '1.0.0' },
+    { sourceId: 'hermes', adapter: new HermesAdapter(), version: '1.0.0' },
+    { sourceId: 'openclaw', adapter: new OpenClawAdapter(), version: '1.0.0' },
   ];
 }
 
 describe('agent adapter contract', () => {
-  it.each(agentAdapterCases())('$sourceId does not discover or read an unapproved default location', async ({ adapter, sourceId }) => {
-    expect(adapter.manifest()).toMatchObject({ id: sourceId, supportsBodies: true, version: '1.0.0' });
+  it.each(agentAdapterCases())('$sourceId does not discover or read an unapproved default location', async ({ adapter, sourceId, version }) => {
+    expect(adapter.manifest()).toMatchObject({ id: sourceId, supportsBodies: true, version });
     expect(await adapter.discover({ platform: process.platform })).toEqual([]);
     expect(await adapter.health()).toEqual({ state: 'ready' });
   });

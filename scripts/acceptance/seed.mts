@@ -14,19 +14,20 @@ const longTitle =
   'and the long tail of regional failover drills across three cloud regions and two on-call rotations';
 
 const claudeRows: unknown[] = [
-  { uuid: 'acc-001', created_at: hoursAgo(2), type: 'assistant_message', title: 'Atlas engine: planner cache warmup checkpoint', project: 'atlas-engine' },
-  { uuid: 'acc-002', created_at: hoursAgo(5), type: 'tool_use', title: 'Atlas engine: migration dry-run on staging snapshot', project: 'atlas-engine' },
-  { uuid: 'acc-003', created_at: hoursAgo(26), type: 'assistant_message', title: 'Beacon dashboard: chart token audit', project: 'beacon-dashboard' },
-  { uuid: 'acc-004', created_at: hoursAgo(50), type: 'assistant_message', title: longTitle, project: 'quill-notes' },
+  { parentUuid: null, type: 'user', message: { role: 'user', content: longTitle }, uuid: 'acc-001', timestamp: hoursAgo(2), cwd: '/repo/atlas-engine', sessionId: 'sess-atlas' },
+  { parentUuid: null, type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: 'Planner cache warmup checkpoint 已完成。' }] }, uuid: 'acc-002', timestamp: hoursAgo(5), cwd: '/repo/atlas-engine', sessionId: 'sess-atlas' },
+  { parentUuid: null, type: 'user', message: { role: 'user', content: 'Beacon dashboard 图表 token 审查请求。' }, uuid: 'acc-003', timestamp: hoursAgo(26), cwd: '/repo/beacon-dashboard', sessionId: 'sess-beacon' },
+  { parentUuid: null, type: 'user', message: { role: 'user', content: longTitle }, uuid: 'acc-004', timestamp: hoursAgo(50), cwd: '/repo/quill-notes', sessionId: 'sess-quill' },
   'this line is intentionally malformed',
-  { uuid: 'acc-005', created_at: hoursAgo(96), type: 'tool_use', title: 'Quill notes: sync conflict rehearsal', project: 'quill-notes' },
+  { parentUuid: null, type: 'tool_use', message: { role: 'assistant', content: [{ type: 'tool_use', name: 'shell', input: {} }] }, uuid: 'acc-005', timestamp: hoursAgo(96), cwd: '/repo/quill-notes', sessionId: 'sess-quill' },
 ];
 
 const codexRows: unknown[] = [
-  { id: 'cod-001', timestamp: hoursAgo(3), event_type: 'session_completed', summary: 'Atlas engine: retry budget instrumentation', cwd: 'atlas-engine' },
-  { id: 'cod-002', timestamp: hoursAgo(30), event_type: 'tool_call', summary: 'Beacon dashboard: alert rule lint pass', cwd: 'beacon-dashboard' },
+  { timestamp: hoursAgo(3), type: 'session_meta', payload: { session_id: 'sess-codex-atlas', id: 'meta-atlas', cwd: '/repo/atlas-engine', cli_version: '0.42.0' } },
+  { timestamp: hoursAgo(2), type: 'response_item', payload: { type: 'message', id: 'ri-cod-001', role: 'assistant', content: [{ type: 'text', text: 'Atlas engine: retry budget instrumentation' }] } },
+  { timestamp: hoursAgo(30), type: 'response_item', payload: { type: 'message', id: 'ri-cod-002', role: 'user', content: [{ type: 'text', text: 'Beacon dashboard: alert rule lint pass' }] } },
   'this line is intentionally malformed',
-  { id: 'cod-003', timestamp: hoursAgo(120), event_type: 'session_completed', summary: 'Beacon dashboard: dark shelf contrast sweep', cwd: 'beacon-dashboard' },
+  { timestamp: hoursAgo(120), type: 'event_msg', payload: { type: 'task_complete', turn_id: 'turn-cod-1', last_agent_message: 'Beacon dashboard: dark shelf contrast sweep 完成', duration_ms: 25 * 60000 } },
 ];
 
 const exportRows: unknown[] = [
